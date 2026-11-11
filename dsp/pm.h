@@ -50,7 +50,8 @@ uint8_t pm_get_param(uint8_t param);
 uint8_t pm_preset_index(void);
 uint8_t pm_model(void);
 
-void pm_set_bend(uint32_t bend_q16);                /* 65536 = unison */
+void pm_set_bend(uint32_t bend_q16);                /* 65536 = unison, 32768..131072 */
+void pm_set_aftertouch(uint8_t note, uint8_t value); /* note 255 = channel */
 void pm_set_mod(uint8_t mod);                       /* 0..127, vibrato depth */
 void pm_set_sustain(uint8_t on);
 void pm_set_expr(uint8_t expr);                     /* 0..127 */

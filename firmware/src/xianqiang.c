@@ -220,16 +220,35 @@ static void nudge(uint8_t id, int32_t e)
     pm_set_param(id, (uint8_t)v);
 }
 
+static uint8_t bend_range = 2;
+
 static void bend_from_midi(unsigned d1, unsigned d2)
 {
     int32_t d = (int32_t)((d2 << 7) | d1) - 8192;
+    int32_t range = bend_range ? bend_range : 2;
+    int32_t coef = 3785 * range / 2;
     int32_t sq = (d * d) >> 12;
-    int32_t b = 65536 + (d * 3785 >> 12) + (sq * 109 >> 12);
-    if (b < 56000)
-        b = 56000;
-    if (b > 76000)
-        b = 76000;
+    int32_t b = 65536 + (d * coef >> 12) + ((sq * (109 * range / 2)) >> 12);
+    if (b < 32768)
+        b = 32768;
+    if (b > 131072)
+        b = 131072;
     pm_set_bend((uint32_t)b);
+}
+
+static void fx_cc(uint8_t which, uint8_t val)
+{
+    uint8_t k, m, t, f;
+    pm_fx_get(&k, &m, &t, &f);
+    if (which == 0)
+        k = (uint8_t)(val > 3 ? val % 4u : val);
+    else if (which == 1)
+        m = val;
+    else if (which == 2)
+        t = val;
+    else
+        f = val;
+    pm_fx_set(k, m, t, f);
 }
 
 static void midi_cc(unsigned cc, unsigned val)
@@ -253,6 +272,26 @@ static void midi_cc(unsigned cc, unsigned val)
         pm_set_param(PM_BRIGHT, (uint8_t)val);
     else if (cc == 23)
         pm_set_param(PM_POS, (uint8_t)val);
+    else if (cc == 27)
+        fx_cc(1, (uint8_t)val);
+    else if (cc == 28)
+        fx_cc(2, (uint8_t)val);
+    else if (cc == 29)
+        fx_cc(3, (uint8_t)val);
+    else if (cc == 30)
+        fx_cc(0, (uint8_t)val);
+    else if (cc == 31)
+        bend_range = (uint8_t)(1u + val * 11u / 127u);
+    else if (cc == 102)
+        play.mode = (uint8_t)(val * 4u / 127u);
+    else if (cc == 103)
+        play.rate = (uint8_t)(val * 7u / 127u);
+    else if (cc == 104)
+        play.gate = (uint8_t)(1u + val * 7u / 127u);
+    else if (cc == 105)
+        play.octaves = (uint8_t)(val * 3u / 127u);
+    else if (cc == 106)
+        play.latch = (uint8_t)(val >= 64u);
     else if (cc == 120)
         pm_panic();
     else if (cc == 123)
@@ -339,6 +378,16 @@ static void midi_in(void)
             bend_from_midi(d1, d2);
         else if (ty == 0xB0u)
             midi_cc(d1, d2);
+        else if (ty == 0xD0u)
+            pm_set_aftertouch(255, d1);
+        else if (ty == 0xA0u)
+            pm_set_aftertouch(d1, d2);
+        else if (ty == 0xC0u) {
+            uint8_t level = pm_get_param(PM_LEVEL);
+            pm_load_preset((uint8_t)(d1 % PM_NPRESET));
+            pm_set_param(PM_LEVEL, level);
+            user_mode = 0;
+        }
     }
 }
 

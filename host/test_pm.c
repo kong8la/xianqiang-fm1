@@ -543,6 +543,82 @@ static void test_fx(void)
     expect(pm_fx_ram() < 48u * 1024u, "effect memory stays under 48 KB");
 }
 
+static void test_midi_depth(void)
+{
+    uint32_t n = 0;
+    int16_t *plain, *pushed;
+    int lag;
+    pm_init();
+    pm_load_preset(1);
+    pm_set_bend(131072u);
+    plain = take(1, 69, 100, 400, 500, &n);
+    /* take() resets bend; render manually */
+    free(plain);
+    {
+        uint32_t total = PM_FS / 2, done = 0, i;
+        int32_t buf[256 * 2];
+        int16_t *up = calloc(total, sizeof(int16_t));
+        pm_init();
+        pm_load_preset(1);
+        pm_set_bend(131072u);
+        pm_note_on(69, 100);
+        while (done < total) {
+            uint32_t c = 256;
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++)
+                up[done + i] = (int16_t)buf[2 * i];
+            done += c;
+        }
+        lag = period(up, total, 40, 80);
+        fprintf(stderr, "  octave bend lag %d\n", lag);
+        near(lag, 50, 3, "12-semitone bend reaches the octave");
+        free(up);
+    }
+    {
+        uint32_t total = PM_FS / 4, done, i;
+        int32_t buf[256 * 2];
+        plain = calloc(total, sizeof(int16_t));
+        pushed = calloc(total, sizeof(int16_t));
+        n = total;
+        pm_init();
+        pm_load_preset(1);
+        pm_set_param(PM_BRIGHT, 20);
+        pm_note_on(64, 100);
+        for (done = 0; done < total;) {
+            uint32_t c = 256;
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++)
+                plain[done + i] = (int16_t)buf[2 * i];
+            done += c;
+        }
+        pm_init();
+        pm_load_preset(1);
+        pm_set_param(PM_BRIGHT, 20);
+        pm_set_aftertouch(255, 127);
+        pm_set_aftertouch(64, 127);
+        pm_note_on(64, 100);
+        for (done = 0; done < total;) {
+            uint32_t c = 256;
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++)
+                pushed[done + i] = (int16_t)buf[2 * i];
+            done += c;
+        }
+        expect(hash_pcm(plain, n) != hash_pcm(pushed, n), "aftertouch changes the tone");
+        free(plain);
+        free(pushed);
+    }
+}
+
 static void test_user_bank(void)
 {
     pm_user_bank_t bank, got;
@@ -670,6 +746,7 @@ int main(void)
     test_fx();
     test_user_bank();
     test_play();
+    test_midi_depth();
     if (fails) {
         fprintf(stderr, "%d failure(s)\n", fails);
         return 1;

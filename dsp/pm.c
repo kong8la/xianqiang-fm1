@@ -67,6 +67,8 @@ static volatile uint8_t g_mod;
 static volatile uint8_t g_sus;
 static volatile uint8_t g_expr = 127;
 static volatile uint32_t g_bend = 65536u;
+static volatile uint8_t g_chan_at;
+static volatile uint8_t g_poly_at[128];
 static volatile uint8_t g_ready;
 static volatile uint8_t g_sounding;
 static volatile uint8_t g_last = 255;
@@ -167,11 +169,21 @@ void pm_set_expr(uint8_t expr) { g_expr = expr > 127 ? 127 : expr; }
 
 void pm_set_bend(uint32_t bend_q16)
 {
-    if (bend_q16 < 56000u)
-        bend_q16 = 56000u;
-    if (bend_q16 > 76000u)
-        bend_q16 = 76000u;
+    if (bend_q16 < 32768u)
+        bend_q16 = 32768u;
+    if (bend_q16 > 131072u)
+        bend_q16 = 131072u;
     g_bend = bend_q16;
+}
+
+void pm_set_aftertouch(uint8_t note, uint8_t value)
+{
+    if (value > 127)
+        value = 127;
+    if (note == 255)
+        g_chan_at = value;
+    else if (note < 128)
+        g_poly_at[note] = value;
 }
 
 void pm_set_model(uint8_t model)
@@ -211,6 +223,12 @@ void pm_init(void)
     }
     g_expr = 127;
     g_bend = 65536u;
+    g_chan_at = 0;
+    {
+        uint32_t n;
+        for (n = 0; n < 128u; n++)
+            g_poly_at[n] = 0;
+    }
     g_mod = 0;
     g_sus = 0;
     g_sounding = 0;
@@ -309,16 +327,26 @@ static int32_t pm_q15(int32_t a, int32_t b)
     return (int32_t)(((int64_t)a * (int64_t)b) >> 15);
 }
 
-/* 1/bend around unison. x = bend-65536 (Q16); 1/(1+x) ≈ 1 - x + x^2 - x^3. */
+/* 65536/bend in Q16, for a bend of one octave either way. No 64-bit divide. */
 static uint32_t pm_inv_q16(uint32_t bend)
 {
-    int32_t x = (int32_t)bend - 65536;
-    int32_t x2 = (int32_t)(((int64_t)x * x) >> 16);
-    int32_t x3 = (int32_t)(((int64_t)x2 * x) >> 16);
-    int32_t inv = 65536 - x + x2 - x3;
-    if (inv < 1)
-        inv = 1;
-    return (uint32_t)inv;
+    uint32_t q = 0, r = 0;
+    int i;
+    if (bend < 32768u)
+        bend = 32768u;
+    if (bend > 131072u)
+        bend = 131072u;
+    for (i = 0; i < 33; i++) {
+        r <<= 1;
+        if (i == 0)
+            r |= 1u;
+        q <<= 1;
+        if (r >= bend) {
+            r -= bend;
+            q |= 1u;
+        }
+    }
+    return q ? q : 1u;
 }
 
 static uint32_t pm_bend_now(uint32_t *vib_ph, uint32_t *inv_out)
@@ -332,10 +360,10 @@ static uint32_t pm_bend_now(uint32_t *vib_ph, uint32_t *inv_out)
         delta = -4000;
     if ((int32_t)bend + delta > 0)
         bend = (uint32_t)((int32_t)bend + delta);
-    if (bend < 52000u)
-        bend = 52000u;
-    if (bend > 80000u)
-        bend = 80000u;
+    if (bend < 32768u)
+        bend = 32768u;
+    if (bend > 131072u)
+        bend = 131072u;
     *inv_out = pm_inv_q16(bend);
     return bend;
 }
@@ -751,7 +779,16 @@ void pm_render(int32_t *out, uint32_t n)
     for (i = 0; i < n; i++) {
         uint32_t inv = 65536u, bend;
         int32_t acc_l = 0, acc_r = 0;
-        int32_t bright_q15 = (int32_t)bright * 258;
+        int32_t bright_q15;
+        {
+            uint32_t br = bright;
+            uint32_t at = g_chan_at;
+            if (br + at / 2u > 127u)
+                br = 127u;
+            else
+                br += at / 2u;
+            bright_q15 = (int32_t)br * 258;
+        }
         if (bright_q15 > 32767)
             bright_q15 = 32767;
         bend = pm_bend_now(&vib, &inv);
@@ -760,14 +797,25 @@ void pm_render(int32_t *out, uint32_t n)
             int released, sounding;
             int32_t y, lg, pan, breath_to, step;
             uint32_t del;
+            int32_t vbright;
+            uint8_t color;
             if (!voice->alive)
                 continue;
+            vbright = bright_q15;
+            color = g_param[PM_COLOR];
+            if (voice->note < 128u && g_poly_at[voice->note]) {
+                uint32_t extra = g_poly_at[voice->note];
+                vbright += (int32_t)(extra / 2u) * 258;
+                if (vbright > 32767)
+                    vbright = 32767;
+                color = (uint8_t)((uint32_t)color + extra / 4u > 127u ? 127u : color + extra / 4u);
+            }
             released = !(voice->held || voice->sus);
             sounding = voice->held || voice->sus;
             del = pm_delay_of(voice->base_del, inv, voice->model == PM_REED && !voice->flute);
             if (voice->model == PM_PLUCK) {
                 lg = loop_gain(decay, released, 0);
-                y = render_pluck(voice, del, lg, bright_q15);
+                y = render_pluck(voice, del, lg, vbright);
             } else if (voice->model == PM_BOW || voice->model == PM_REED) {
                 int32_t k = 127 - (int32_t)decay;
                 int32_t loss = 3 + k / 4;
@@ -793,11 +841,11 @@ void pm_render(int32_t *out, uint32_t n)
                         voice->breath = breath_to;
                 }
                 if (voice->model == PM_BOW || voice->flute)
-                    y = render_sustained(voice, del, lg, bright_q15, voice->breath, voice->flute);
+                    y = render_sustained(voice, del, lg, vbright, voice->breath, voice->flute);
                 else
-                    y = render_wind(voice, del, lg, bright_q15, voice->breath);
+                    y = render_wind(voice, del, lg, vbright, voice->breath);
             } else {
-                y = render_modal(voice, bend, released, decay, g_param[PM_COLOR]);
+                y = render_modal(voice, bend, released, decay, color);
             }
             y = dc_block(voice, y);
             if (voice->fade < 32767) {
