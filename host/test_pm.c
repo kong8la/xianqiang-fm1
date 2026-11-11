@@ -3,6 +3,7 @@
 #include "pm.h"
 #include "pm_fx.h"
 #include "pm_user.h"
+#include "xq_play.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -573,6 +574,87 @@ static void test_user_bank(void)
     expect(!got.slot[2].used, "fallback bank is empty");
 }
 
+static void clocks(xq_play_t *p, int count, uint8_t *got, int *ng)
+{
+    int i;
+    *ng = 0;
+    for (i = 0; i < count; i++) {
+        uint8_t note[2], vel[2];
+        int k, c = xq_play_clock(p, note, vel);
+        for (k = 0; k < c; k++)
+            if (vel[k] && *ng < 16)
+                got[(*ng)++] = note[k];
+    }
+}
+
+static void test_play(void)
+{
+    xq_play_t p;
+    uint8_t got[16];
+    int n = 0, i, ok;
+    xq_play_init(&p);
+    p.arp_on = 1;
+    p.rate = 0;
+    p.mode = XQ_ARP_UP;
+    xq_play_note(&p, 64, 100);
+    xq_play_note(&p, 60, 100);
+    xq_play_note(&p, 67, 100);
+    clocks(&p, 36, got, &n);
+    expect(n >= 4 && got[0] == 60 && got[1] == 64 && got[2] == 67 && got[3] == 60, "arp up");
+    xq_play_init(&p);
+    p.arp_on = 1;
+    p.rate = 0;
+    p.mode = XQ_ARP_DN;
+    xq_play_note(&p, 60, 100);
+    xq_play_note(&p, 64, 100);
+    xq_play_note(&p, 67, 100);
+    clocks(&p, 24, got, &n);
+    expect(n >= 3 && got[0] == 67 && got[1] == 64 && got[2] == 60, "arp down");
+    xq_play_init(&p);
+    p.arp_on = 1;
+    p.rate = 0;
+    p.mode = XQ_ARP_AS;
+    xq_play_note(&p, 67, 100);
+    xq_play_note(&p, 60, 100);
+    xq_play_note(&p, 64, 100);
+    clocks(&p, 24, got, &n);
+    expect(n >= 3 && got[0] == 67 && got[1] == 60 && got[2] == 64, "arp as played");
+    xq_play_init(&p);
+    p.arp_on = 1;
+    p.rate = 0;
+    p.mode = XQ_ARP_UD;
+    xq_play_note(&p, 60, 80);
+    xq_play_note(&p, 64, 80);
+    xq_play_note(&p, 67, 80);
+    clocks(&p, 36, got, &n);
+    expect(n >= 5 && got[0] == 60 && got[1] == 64 && got[2] == 67 && got[3] == 64 && got[4] == 60, "arp up-down");
+    xq_play_init(&p);
+    p.arp_on = 1;
+    p.rate = 0;
+    p.latch = 1;
+    xq_play_note(&p, 60, 100);
+    xq_play_note(&p, 60, 0);
+    clocks(&p, 12, got, &n);
+    expect(n >= 1 && got[0] == 60, "latch holds a released note");
+    xq_play_init(&p);
+    p.seq_on = 1;
+    p.rate = 0;
+    clocks(&p, 24, got, &n);
+    expect(n >= 4 && got[0] == 60 && got[1] == 62 && got[2] == 64 && got[3] == 67, "step sequencer");
+    xq_play_init(&p);
+    p.arp_on = 1;
+    p.rate = 0;
+    p.mode = XQ_ARP_RND;
+    xq_play_note(&p, 60, 90);
+    xq_play_note(&p, 72, 90);
+    clocks(&p, 48, got, &n);
+    ok = n >= 4;
+    for (i = 0; i < n; i++)
+        if (got[i] != 60 && got[i] != 72)
+            ok = 0;
+    expect(ok, "random arp stays on the held notes");
+}
+
 int main(void)
 {
     test_silence();
@@ -587,6 +669,7 @@ int main(void)
     test_level_and_panic_noteoff();
     test_fx();
     test_user_bank();
+    test_play();
     if (fails) {
         fprintf(stderr, "%d failure(s)\n", fails);
         return 1;

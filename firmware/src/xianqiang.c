@@ -17,6 +17,7 @@ static void app_idle(void);
 #include "platform.c"
 #include "pm.c"
 #include "pm_user.c"
+#include "xq_play.c"
 #if BOARD_SMK37
 #include "smk_wheel.h"
 #endif
@@ -120,6 +121,8 @@ static void apply_set(void)
 
 static uint32_t idle_ok, midi_src, clk_n, clk_t0, clk_bpm, clk_run, clk_beat_ms;
 static uint8_t midi_sus;
+static xq_play_t play;
+static uint32_t ext_clk_ms, int_clk_ms, int_run;
 static pm_user_bank_t ubank;
 static int ubank_src = -1;
 static uint8_t user_mode, user_slot, save_wait;
@@ -205,6 +208,44 @@ static void midi_cc(unsigned cc, unsigned val)
         pm_all_notes_off();
 }
 
+static void play_clocks(void)
+{
+    uint8_t note[2], vel[2];
+    uint32_t ch = set.ch ? set.ch - 1u : 0u;
+    int n = xq_play_clock(&play, note, vel), i;
+    for (i = 0; i < n; i++) {
+        if (vel[i]) {
+            pm_note_on(note[i], vel[i]);
+            midi_send(0x90u | ch, note[i], vel[i]);
+        } else {
+            pm_note_off(note[i]);
+            midi_send(0x80u | ch, note[i], 0);
+        }
+    }
+}
+
+static void local_on(uint8_t note, uint8_t vel, uint32_t ch)
+{
+    if (play.arp_on)
+        xq_play_note(&play, note, vel);
+    else
+        pm_note_on(note, vel);
+    if (play.rec)
+        xq_play_rec_note(&play, note, vel);
+    midi_send(0x90u | ch, note, vel);
+}
+
+static void local_off(uint8_t note, uint32_t ch)
+{
+    if (!note)
+        return;
+    if (play.arp_on)
+        xq_play_note(&play, note, 0);
+    else
+        pm_note_off(note);
+    midi_send(0x80u | ch, note, 0);
+}
+
 static void midi_in(void)
 {
     uint8_t st, d1, d2;
@@ -221,6 +262,9 @@ static void midi_in(void)
                 clk_beat_ms = fm1_ms;
             }
             clk_n++;
+            ext_clk_ms = fm1_ms;
+            if (play.arp_on || play.seq_on)
+                play_clocks();
             continue;
         }
         if (st == 0xFAu) { clk_run = 1; clk_n = 0; continue; }
@@ -229,10 +273,17 @@ static void midi_in(void)
         if (set.ch && (st & 15u) != set.ch - 1u)
             continue;
         if (ty == 0x90u && d2) {
-            pm_note_on(d1, d2);
+            if (play.arp_on)
+                xq_play_note(&play, d1, d2);
+            else
+                pm_note_on(d1, d2);
             midi_src = (uint32_t)src;
-        } else if (ty == 0x80u || ty == 0x90u)
-            pm_note_off(d1);
+        } else if (ty == 0x80u || ty == 0x90u) {
+            if (play.arp_on)
+                xq_play_note(&play, d1, 0);
+            else
+                pm_note_off(d1);
+        }
         else if (ty == 0xE0u)
             bend_from_midi(d1, d2);
         else if (ty == 0xB0u)
@@ -274,6 +325,7 @@ static void app_main(void)
     smk_pad_events = 1;
 #endif
     pm_init();
+    xq_play_init(&play);
     load_user_bank();
     if (settings_load(&set, sizeof set) || set.oct < -2 || set.oct > 2 || set.ch > 16u || set.preset >= PM_NPRESET) {
         set.oct = 0;
@@ -313,13 +365,10 @@ static void app_main(void)
 #endif
             if (down >> k & 1u) {
                 held[k] = (uint8_t)(base + k);
-                pm_note_on(held[k], (uint8_t)vel);
-                midi_send(0x90u | out_ch, held[k], vel);
+                local_on(held[k], (uint8_t)vel, out_ch);
             }
-            if (up >> k & 1u) {
-                pm_note_off(held[k]);
-                midi_send(0x80u | out_ch, held[k], 0);
-            }
+            if (up >> k & 1u)
+                local_off(held[k], out_ch);
         }
 #if BOARD_SMK37
         while ((e = smk_extkey_take()) >= 0) {
@@ -328,11 +377,9 @@ static void app_main(void)
                 continue;
             if (vel) {
                 ext_note[key] = (uint8_t)(base + key - SMK_KEY_F3);
-                pm_note_on(ext_note[key], (uint8_t)vel);
-                midi_send(0x90u | out_ch, ext_note[key], vel);
+                local_on(ext_note[key], (uint8_t)vel, out_ch);
             } else if (ext_note[key]) {
-                pm_note_off(ext_note[key]);
-                midi_send(0x80u | out_ch, ext_note[key], 0);
+                local_off(ext_note[key], out_ch);
                 ext_note[key] = 0;
             }
         }
@@ -341,11 +388,9 @@ static void app_main(void)
             uint32_t w = pad < 8u ? pad + 8u : pad - 8u;
             if (vel) {
                 pad_note[pad] = (uint8_t)(base + WHITE[w]);
-                pm_note_on(pad_note[pad], (uint8_t)vel);
-                midi_send(0x90u | out_ch, pad_note[pad], vel);
+                local_on(pad_note[pad], (uint8_t)vel, out_ch);
             } else if (pad_note[pad]) {
-                pm_note_off(pad_note[pad]);
-                midi_send(0x80u | out_ch, pad_note[pad], 0);
+                local_off(pad_note[pad], out_ch);
                 pad_note[pad] = 0;
             }
         }
@@ -371,6 +416,21 @@ static void app_main(void)
         }
         if (b & (1u << BTN_HOME))
             pm_panic();
+        if (b & (1u << BTN_ARP))
+            play.arp_on = (uint8_t)!play.arp_on;
+        if (b & (1u << BTN_SEQ))
+            play.seq_on = (uint8_t)!play.seq_on;
+        if (b & (1u << BTN_REC))
+            play.rec = (uint8_t)!play.rec;
+        if (b & (1u << BTN_PLAY)) {
+            int_run = int_run ? 0 : 1;
+            int_clk_ms = fm1_ms;
+            midi_send(int_run ? 0xFAu : 0xFCu, 0, 0);
+            if (!int_run && play.sounding) {
+                pm_note_off(play.cur);
+                play.sounding = 0;
+            }
+        }
         if (b & (1u << BTN_FX)) {
             uint8_t k, m, t, f;
             pm_fx_get(&k, &m, &t, &f);
@@ -430,6 +490,17 @@ static void app_main(void)
         if (clk_bpm && fm1_ms - clk_t0 > 2000u)
             clk_bpm = 0, clk_run = 0;
         pm_fx_set_bpm((uint16_t)clk_bpm);
+        if (int_run && fm1_ms - ext_clk_ms > 80u) {
+            uint32_t step = 60000u / 24u / 120u;
+            if (!int_clk_ms)
+                int_clk_ms = fm1_ms;
+            while (fm1_ms - int_clk_ms >= step) {
+                int_clk_ms += step;
+                midi_send(0xF8u, 0, 0);
+                if (play.arp_on || play.seq_on)
+                    play_clocks();
+            }
+        }
 
         oct = set.oct;
         base = (uint32_t)((int32_t)KEY0 + 12 * oct);
@@ -443,7 +514,10 @@ static void app_main(void)
         fm1_led_key(BTN_ENV, set.latch || midi_sus);
         fm1_led_key(BTN_LFO, user_mode);
         fm1_led_key(BTN_SAVE, save_wait);
-        fm1_led_key(BTN_PLAY, clk_run || (clk_bpm && fm1_ms - clk_beat_ms < 80u));
+        fm1_led_key(BTN_ARP, play.arp_on);
+        fm1_led_key(BTN_SEQ, play.seq_on);
+        fm1_led_key(BTN_REC, play.rec);
+        fm1_led_key(BTN_PLAY, int_run || clk_run || (clk_bpm && fm1_ms - clk_beat_ms < 80u));
 #if BOARD_SMK37
         for (k = 0; k < 16u; k++) {
             uint32_t w = k < 8u ? k + 8u : k - 8u, on = lit >> WHITE[w] & 1u;
