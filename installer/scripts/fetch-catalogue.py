@@ -23,7 +23,7 @@ V15_URL = (
     "b178ac43c25f010c60a878056fb5331fe693fd62/sdk/firmware/FM-1_015.fwsc"
 )
 V15_SHA = "db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a"
-KEEP = {"xianqiang-0.1.fwsc", "FM-1_015.fwsc"}
+KEEP = {"daoge-0.2.fwsc", "xianqiang-0.1.fwsc", "FM-1_015.fwsc"}
 
 
 def get(url: str) -> bytes:
@@ -39,11 +39,15 @@ def sha256(blob: bytes) -> str:
 def main() -> None:
     PKG.mkdir(parents=True, exist_ok=True)
 
-    xq_src = ROOT.parents[0] / "dist" / "xianqiang-0.1.fwsc"
-    xq_dst = PKG / "xianqiang-0.1.fwsc"
-    if xq_src.is_file():
-        xq_dst.write_bytes(xq_src.read_bytes())
-    xq = xq_dst.read_bytes()
+    def mirror(name: str) -> bytes:
+        src = ROOT.parents[0] / "dist" / name
+        dst = PKG / name
+        if src.is_file():
+            dst.write_bytes(src.read_bytes())
+        return dst.read_bytes()
+
+    cur = mirror("daoge-0.2.fwsc")
+    prev = mirror("xianqiang-0.1.fwsc")
 
     v15_path = PKG / "FM-1_015.fwsc"
     if v15_path.is_file() and sha256(v15_path.read_bytes()) == V15_SHA:
@@ -60,7 +64,8 @@ def main() -> None:
             path.unlink()
             print(f"removed {path.name}")
 
-    xq_sha = sha256(xq)
+    cur_sha = sha256(cur)
+    prev_sha = sha256(prev)
     v15_sha = sha256(v15)
     doc = {
         "generatedBy": "installer/scripts/fetch-catalogue.py",
@@ -68,22 +73,39 @@ def main() -> None:
         "attribution": "官方 V15 来自 m-vave/fm1_open 提交 b178ac4 的 sdk/firmware/FM-1_015.fwsc。",
         "firmwares": [
             {
-                "id": "xianqiang",
+                "id": "daoge",
                 "kind": "install",
                 "featured": True,
+                "name": "道哥合成器",
+                "author": "本仓库",
+                "summary": "0.2：更多预设和用户槽、混响延时合唱、琶音和音序、筝锣风琴管。认 Puya 与 UC25HQ80。",
+                "license": "GPL-3.0-only",
+                "version": "0.2",
+                "source": "https://github.com/kong8la/xianqiang-fm1",
+                "flash": "new",
+                "product": "FM-1_942",
+                "sha256": cur_sha,
+                "size": len(cur),
+                "file": "pkg/daoge-0.2.fwsc",
+                "tag": "v0.2",
+            },
+            {
+                "id": "xianqiang",
+                "kind": "install",
+                "featured": False,
                 "name": "道哥合成器 0.1",
                 "author": "本仓库",
-                "summary": "六复音物理建模：拨弦、木棒、钟、鼓膜、拉弦和单簧管/长笛。认 Puya 与 UC25HQ80。",
+                "summary": "上一版。六复音物理建模：拨弦、木棒、钟、鼓膜、拉弦和单簧管/长笛。",
                 "license": "GPL-3.0-only",
                 "version": "0.1",
                 "source": "https://github.com/kong8la/xianqiang-fm1",
                 "flash": "new",
                 "product": "FM-1_941",
-                "sha256": xq_sha,
-                "size": len(xq),
+                "sha256": prev_sha,
+                "size": len(prev),
                 "file": "pkg/xianqiang-0.1.fwsc",
                 "tag": "v0.1",
-            }
+            },
         ],
         "official": {
             "id": "v15",
@@ -103,7 +125,7 @@ def main() -> None:
         },
     }
     (PUBLIC / "catalogue.json").write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
-    print(f"catalogue xianqiang {xq_sha[:12]} + official V15 {v15_sha[:12]}")
+    print(f"catalogue daoge {cur_sha[:12]} + 0.1 {prev_sha[:12]} + V15 {v15_sha[:12]}")
 
 
 if __name__ == "__main__":

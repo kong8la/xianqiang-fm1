@@ -45,6 +45,7 @@ jobs:
       - name: Mirrored packages are in the site
         run: |
           test -f installer/dist/catalogue.json
+          test -f installer/dist/pkg/daoge-0.2.fwsc
           test -f installer/dist/pkg/xianqiang-0.1.fwsc
           test -f installer/dist/pkg/FM-1_015.fwsc
           python3 - << 'PY'
@@ -53,8 +54,8 @@ jobs:
           doc = json.loads(Path("installer/dist/catalogue.json").read_text())
           entries = doc["firmwares"] + [doc["official"]]
           ids = [e["id"] for e in entries]
-          if ids != ["xianqiang", "v15"]:
-              raise SystemExit(f"catalogue ids {ids} != ['xianqiang', 'v15']")
+          if ids != ["daoge", "xianqiang", "v15"]:
+              raise SystemExit(f"catalogue ids {ids} != ['daoge', 'xianqiang', 'v15']")
           if doc.get("links"):
               raise SystemExit("catalogue still has link cards")
           for e in entries:

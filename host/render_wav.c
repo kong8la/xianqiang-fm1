@@ -120,9 +120,21 @@ int main(void)
         {200, 1100, 10, 62, 100}, {1500, 1100, 11, 50, 96},
         {2800, 1000, 12, 67, 100}, {4000, 1100, 13, 74, 96},
     };
+    const ev_t koto[] = {
+        {100, 900, 32, 62, 100}, {500, 900, 32, 67, 96}, {1000, 1200, 32, 74, 90},
+    };
+    const ev_t gong[] = {
+        {200, 1800, 33, 48, 110}, {900, 1600, 33, 55, 90},
+    };
+    const ev_t zheng[] = {
+        {80, 700, 36, 60, 108}, {400, 700, 36, 64, 100}, {760, 900, 36, 67, 104}, {1200, 1000, 36, 72, 96},
+    };
     one("demos/nylon-steel.wav", nylon, 5, 2800);
     one("demos/marimba.wav", marimba, 5, 2400);
     one("demos/bell.wav", bell, 3, 2800);
     one("demos/bow-reed.wav", winds, 4, 5200);
+    one("demos/koto.wav", koto, 3, 2400);
+    one("demos/gong.wav", gong, 2, 2800);
+    one("demos/zheng.wav", zheng, 4, 2400);
     return 0;
 }

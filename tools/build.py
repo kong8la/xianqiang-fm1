@@ -326,7 +326,7 @@ def main():
             raise SystemExit(f"--release {a.release}: use X.Y, X.Y.Z or X.Y-suffix, one digit each")
         PRODUCT = BOARD_PREFIX[BOARD] + m[2]
         VERSION = m[1] + "." + m[2] + (m[3] or "")
-        name = f"xianqiang-{a.release}{suffix}.fwsc"
+        name = f"daoge-{a.release}{suffix}.fwsc"
     fm1pkg_make.SDK = a.sdk
     for rel, sha in SDK_SHA256.items():          # fail early without the SDK
         if hashlib.sha256(fm1pkg_make.sdk_file(rel)).hexdigest() != sha:

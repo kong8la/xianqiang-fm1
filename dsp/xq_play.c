@@ -1,6 +1,12 @@
 /* SPDX-License-Identifier: MIT */
 #include "xq_play.h"
-#include <string.h>
+
+static void xq_zero(void *p, unsigned n)
+{
+    unsigned char *b = p;
+    while (n--)
+        *b++ = 0;
+}
 
 static const uint8_t DIV[8] = {6, 8, 12, 16, 24, 32, 48, 96};
 static const uint8_t PENTA[16] = {60, 62, 64, 67, 69, 67, 64, 62, 60, 64, 67, 72, 67, 64, 60, 62};
@@ -8,7 +14,7 @@ static const uint8_t PENTA[16] = {60, 62, 64, 67, 69, 67, 64, 62, 60, 64, 67, 72
 void xq_play_init(xq_play_t *p)
 {
     uint32_t i;
-    memset(p, 0, sizeof *p);
+    xq_zero(p, sizeof *p);
     p->dir = 1;
     p->gate = 4;
     p->rate = 2;

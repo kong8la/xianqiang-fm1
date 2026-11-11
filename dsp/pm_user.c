@@ -2,9 +2,15 @@
 #include "pm_user.h"
 #include "pm.h"
 #include "pm_fx.h"
-#include <string.h>
 
-static uint32_t crc32(const uint8_t *p, uint32_t n)
+static void pm_user_zero(void *p, unsigned n)
+{
+    unsigned char *b = p;
+    while (n--)
+        *b++ = 0;
+}
+
+static uint32_t pm_user_crc32(const uint8_t *p, uint32_t n)
 {
     uint32_t c = 0xFFFFFFFFu, k;
     while (n--) {
@@ -31,9 +37,14 @@ static uint32_t get_u32(const uint8_t *p)
 void pm_user_reset(pm_user_bank_t *b)
 {
     uint32_t i;
-    memset(b, 0, sizeof *b);
-    for (i = 0; i < PM_USER_N; i++)
-        memcpy(b->slot[i].name, "EMPTY", 6);
+    pm_user_zero(b, sizeof *b);
+    for (i = 0; i < PM_USER_N; i++) {
+        b->slot[i].name[0] = 'E';
+        b->slot[i].name[1] = 'M';
+        b->slot[i].name[2] = 'P';
+        b->slot[i].name[3] = 'T';
+        b->slot[i].name[4] = 'Y';
+    }
 }
 
 static void pack_slot(uint8_t *p, const pm_user_slot_t *s)
@@ -54,7 +65,7 @@ static void pack_slot(uint8_t *p, const pm_user_slot_t *s)
 static void unpack_slot(pm_user_slot_t *s, const uint8_t *p)
 {
     uint32_t i;
-    memset(s, 0, sizeof *s);
+    pm_user_zero(s, sizeof *s);
     s->used = p[0];
     s->model = p[1];
     for (i = 0; i < 6u; i++)
@@ -71,7 +82,7 @@ static void unpack_slot(pm_user_slot_t *s, const uint8_t *p)
 int pm_user_encode(const pm_user_bank_t *b, uint8_t *dst)
 {
     uint32_t i;
-    memset(dst, 0, PM_USER_BYTES);
+    pm_user_zero(dst, PM_USER_BYTES);
     put_u32(dst, 0x53554744u); /* "DGUS" */
     dst[4] = 1;
     dst[5] = (uint8_t)PM_USER_N;
@@ -79,7 +90,7 @@ int pm_user_encode(const pm_user_bank_t *b, uint8_t *dst)
     put_u32(dst + 8, b->seq);
     for (i = 0; i < PM_USER_N; i++)
         pack_slot(dst + 12u + i * 20u, &b->slot[i]);
-    put_u32(dst + 172, crc32(dst, 172));
+    put_u32(dst + 172, pm_user_crc32(dst, 172));
     return 0;
 }
 
@@ -91,9 +102,9 @@ int pm_user_decode(const uint8_t *src, uint32_t n, pm_user_bank_t *b)
         return -1;
     if (get_u32(src) != 0x53554744u || src[4] != 1u || src[5] != PM_USER_N)
         return -1;
-    if (get_u32(src + 172) != crc32(src, 172))
+    if (get_u32(src + 172) != pm_user_crc32(src, 172))
         return -1;
-    memset(&tmp, 0, sizeof tmp);
+    pm_user_zero(&tmp, sizeof tmp);
     tmp.cur = src[6];
     if (tmp.cur >= PM_USER_N)
         tmp.cur = 0;
@@ -144,7 +155,7 @@ void pm_user_store_current(pm_user_bank_t *b, uint8_t slot, const char *name)
     if (!b || slot >= PM_USER_N)
         return;
     s = &b->slot[slot];
-    memset(s, 0, sizeof *s);
+    pm_user_zero(s, sizeof *s);
     s->used = 1;
     s->model = pm_model();
     for (i = 0; i < PM_NPARAM && i < 6u; i++)

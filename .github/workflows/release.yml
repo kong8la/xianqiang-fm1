@@ -1,4 +1,4 @@
-# XianQiang: on a tag vX.Y, build the FM-1 and SMK-37 packages and attach xianqiang-*.fwsc
+# 道哥合成器: on a tag vX.Y, build the FM-1 and SMK-37 packages and attach daoge-*.fwsc
 # to the GitHub Release. The JieLi toolchain and AC79 SDK are fetched in CI (Apache-2.0 SDK
 # blobs are packed into the .fwsc; they are not stored in the git tree). workflow_dispatch
 # builds without publishing a release.
@@ -57,8 +57,8 @@ jobs:
           BOARD=smk37 MODEL=elite sh build.sh --release "$V"
           BOARD=smk37 MODEL=mke sh build.sh --release "$V"
           sh build.sh --release "$V"
-          ls -l build/xianqiang-"$V"*.fwsc
-          (cd build && sha256sum xianqiang-"$V"*.fwsc > SHA256SUMS)
+          ls -l build/daoge-"$V"*.fwsc
+          (cd build && sha256sum daoge-"$V"*.fwsc > SHA256SUMS)
 
       - uses: actions/upload-artifact@v4
         with:
@@ -70,7 +70,7 @@ jobs:
         if: github.ref_type == 'tag'
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: build/xianqiang-[0-9]*.fwsc
+          subject-path: build/daoge-[0-9]*.fwsc
 
       # (the release builds only, not the dev ones: xianqiang-smk37.fwsc – no comment inside the block below: it would be part of the pattern)
       - name: Release (tags only)
@@ -78,6 +78,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/xianqiang-[0-9]*.fwsc
+            build/daoge-[0-9]*.fwsc
             build/SHA256SUMS
           generate_release_notes: true

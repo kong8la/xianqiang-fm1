@@ -95,8 +95,12 @@ describe("pages base path", () => {
 describe("catalogue", () => {
   it("offers only XianQiang, with official V15 kept for restore", () => {
     const doc = JSON.parse(readFileSync(new URL("../public/catalogue.json", import.meta.url), "utf8"));
-    expect(doc.firmwares.map((e: { id: string }) => e.id)).toEqual(["xianqiang"]);
-    expect(doc.firmwares[0].file).toBe("pkg/xianqiang-0.1.fwsc");
+    expect(doc.firmwares.map((e: { id: string }) => e.id)).toEqual(["daoge", "xianqiang"]);
+    expect(doc.firmwares[0].file).toBe("pkg/daoge-0.2.fwsc");
+    expect(doc.firmwares[0].product).toBe("FM-1_942");
+    expect(doc.firmwares[0].name).toBe("道哥合成器");
+    expect(doc.firmwares[1].file).toBe("pkg/xianqiang-0.1.fwsc");
+    expect(doc.firmwares[1].name).toBe("道哥合成器 0.1");
     expect(doc.firmwares[0].flash).toBe("new");
     expect(doc.official.id).toBe("v15");
     expect(doc.official.file).toBe("pkg/FM-1_015.fwsc");
@@ -104,7 +108,7 @@ describe("catalogue", () => {
     expect(doc.official.sha256).toBe(V15_SHA256);
     expect(doc.links).toBeUndefined();
     const names = readdirSync(new URL("../public/pkg/", import.meta.url)).sort();
-    expect(names).toEqual(["FM-1_015.fwsc", "xianqiang-0.1.fwsc"]);
+    expect(names).toEqual(["FM-1_015.fwsc", "daoge-0.2.fwsc", "xianqiang-0.1.fwsc"]);
   });
 });
 
