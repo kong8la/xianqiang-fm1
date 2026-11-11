@@ -1,0 +1,105 @@
+:root {
+  color-scheme: dark;
+  --bg: #14110d;
+  --bg-2: #1d1914;
+  --line: #3a3228;
+  --ink: #f4ecdf;
+  --muted: #b3a48f;
+  --amber: #e7a64a;
+  --amber-2: #f3d7a1;
+  --good: #8fceab;
+  --bad: #ef6d57;
+  --warn: #e6b15a;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  font-family: "Avenir Next", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { min-height: 100vh; }
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--amber-2); }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 64px; }
+header.top { display: flex; justify-content: space-between; gap: 18px; align-items: flex-end; flex-wrap: wrap; }
+.mark { letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); font-size: 12px; margin: 0 0 6px; }
+h1 { font-size: clamp(32px, 5vw, 52px); line-height: 0.95; margin: 0; font-weight: 650; }
+.lede { max-width: 46rem; color: var(--muted); margin: 10px 0 0; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button {
+  background: var(--amber);
+  color: #24180a;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 650;
+  cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.danger { background: var(--bad); color: #2a0d09; }
+
+.device, .banner, .card, .rescue, .dialog {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.device { margin-top: 22px; padding: 16px 18px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+.device strong { font-size: 18px; }
+.meta { color: var(--muted); margin: 4px 0 0; }
+.chip-pick { display: flex; flex-direction: column; gap: 6px; }
+.chip-pick select, .toolbar input {
+  background: #100e0b;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.banner {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-color: #6a4a22;
+  background: #2a2116;
+}
+.banner strong { color: var(--amber-2); }
+
+.toolbar { display: flex; gap: 10px; margin: 18px 0; flex-wrap: wrap; }
+.toolbar input { flex: 1; min-width: 180px; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: #1a140e; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.card { padding: 16px; display: flex; flex-direction: column; gap: 8px; min-height: 210px; }
+.card.featured { grid-column: 1 / -1; background:
+  radial-gradient(600px 120px at 0 0, rgba(231, 166, 74, 0.18), transparent 60%), var(--bg-2); }
+.card h2 { margin: 0; font-size: 22px; }
+.who { color: var(--muted); margin: 0; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted); }
+.tag.good { color: var(--good); border-color: #2f5b45; }
+.tag.bad { color: var(--bad); border-color: #6d3228; }
+.card p { margin: 0; flex: 1; }
+.card .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+
+.rescue { margin-top: 22px; padding: 18px; }
+.rescue h2 { margin-top: 0; }
+.rescue ol { padding-left: 18px; }
+.rescue li { margin: 8px 0; }
+footer { color: var(--muted); font-size: 13px; margin-top: 18px; }
+
+.dialog-back {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55);
+  display: grid; place-items: end center; padding: 16px;
+}
+.dialog { width: min(520px, 100%); padding: 18px; box-shadow: var(--shadow); margin-bottom: 8px; }
+.bar { height: 8px; background: #100e0b; border-radius: 99px; overflow: hidden; margin: 12px 0; }
+.bar span { display: block; height: 100%; background: var(--amber); width: 0; }
+.err { color: var(--bad); }
+.ok { color: var(--good); }
+
+@media (max-width: 720px) {
+  .device { grid-template-columns: 1fr; }
+  .wrap { padding: 18px 14px 80px; }
+  .dialog-back { place-items: end stretch; }
+}

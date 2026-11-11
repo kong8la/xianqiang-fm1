@@ -1,0 +1,511 @@
+/* SPDX-License-Identifier: MIT */
+/* Host tests for the physical-modeling core. No hardware, no float in the DSP. */
+#include "pm.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int fails;
+
+static void expect(int cond, const char *msg)
+{
+    if (!cond) {
+        fprintf(stderr, "FAIL %s\n", msg);
+        fails++;
+    }
+}
+
+static void zero(int32_t *x, uint32_t n)
+{
+    memset(x, 0, n * sizeof *x);
+}
+
+/* Render a mono (left) take. Caller frees. */
+static int16_t *take(uint8_t preset, uint8_t note, uint8_t vel, uint32_t on_ms, uint32_t total_ms, uint32_t *frames)
+{
+    uint32_t total = (uint32_t)((uint64_t)total_ms * PM_FS / 1000u);
+    uint32_t on = (uint32_t)((uint64_t)on_ms * PM_FS / 1000u);
+    uint32_t done = 0;
+    int16_t *dst = calloc(total ? total : 1, sizeof(int16_t));
+    int32_t buf[256 * 2];
+    if (!dst)
+        exit(1);
+    pm_init();
+    pm_load_preset(preset);
+    pm_render(buf, 1); /* drain nothing; init has no queued notes */
+    pm_note_on(note, vel);
+    while (done < total) {
+        uint32_t n = 256;
+        uint32_t i;
+        if (n > total - done)
+            n = total - done;
+        zero(buf, n * 2);
+        if (done < on && done + n >= on)
+            pm_note_off(note);
+        pm_render(buf, n);
+        for (i = 0; i < n; i++) {
+            int32_t s = buf[2 * i];
+            if (s > 32767)
+                s = 32767;
+            if (s < -32767)
+                s = -32767;
+            dst[done + i] = (int16_t)s;
+        }
+        done += n;
+    }
+    *frames = total;
+    return dst;
+}
+
+static int64_t energy(const int16_t *x, uint32_t a, uint32_t b)
+{
+    int64_t e = 0;
+    uint32_t i;
+    if (b > a) {
+        for (i = a; i < b; i++)
+            e += (int64_t)x[i] * x[i];
+        e /= (int64_t)(b - a);
+    }
+    return e;
+}
+
+static int32_t peak(const int16_t *x, uint32_t n)
+{
+    int32_t p = 0;
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int32_t a = x[i] < 0 ? -x[i] : x[i];
+        if (a > p)
+            p = a;
+    }
+    return p;
+}
+
+/* Integer autocorrelation. Returns the lag of the strongest peak. */
+static int period(const int16_t *x, uint32_t n, int minlag, int maxlag)
+{
+    uint32_t start = n / 10u;
+    uint32_t len = n / 3u;
+    int lag, best = minlag;
+    int64_t bestc = INT64_MIN;
+    if (start + len + (uint32_t)maxlag >= n)
+        len = n - start - (uint32_t)maxlag - 1u;
+    for (lag = minlag; lag <= maxlag; lag++) {
+        int64_t c = 0;
+        uint32_t i;
+        for (i = 0; i < len; i += 2)
+            c += (int64_t)x[start + i] * x[start + i + (uint32_t)lag];
+        if (c > bestc) {
+            bestc = c;
+            best = lag;
+        }
+    }
+    return best;
+}
+
+static int64_t hf(const int16_t *x, uint32_t a, uint32_t b)
+{
+    int64_t e = 0;
+    uint32_t i;
+    for (i = a + 1; i < b; i++) {
+        int32_t d = (int32_t)x[i] - x[i - 1];
+        e += (int64_t)d * d;
+    }
+    return e / (int64_t)(b - a);
+}
+
+static uint32_t hash_pcm(const int16_t *x, uint32_t n)
+{
+    uint32_t h = 2166136261u;
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        h ^= (uint16_t)x[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static int near(int got, int want, int tol, const char *msg)
+{
+    if (got < want - tol || got > want + tol) {
+        fprintf(stderr, "FAIL %s (got %d, want %d ±%d)\n", msg, got, want, tol);
+        fails++;
+        return 0;
+    }
+    return 1;
+}
+
+static void test_silence(void)
+{
+    int32_t buf[256 * 2];
+    uint32_t i;
+    pm_init();
+    zero(buf, 512);
+    pm_render(buf, 256);
+    for (i = 0; i < 512; i++)
+        if (buf[i]) {
+            expect(0, "silence before note-on");
+            return;
+        }
+    expect(pm_quiet(), "quiet before any note");
+}
+
+static void test_pluck_pitch(void)
+{
+    uint32_t n = 0;
+    int16_t *x = take(1, 69, 110, 800, 900, &n); /* STEEL, A4 */
+    int lag = period(x, n, 80, 140);
+    int32_t pk = peak(x, n);
+    fprintf(stderr, "  steel A4 lag %d peak %d\n", lag, pk);
+    near(lag, 100, 2, "steel A4 period");
+    expect(pk > 1500 && pk < 32000, "steel A4 level");
+    free(x);
+    x = take(1, 57, 110, 800, 900, &n); /* A3 */
+    lag = period(x, n, 160, 260);
+    fprintf(stderr, "  steel A3 lag %d\n", lag);
+    near(lag, 200, 4, "steel A3 period");
+    free(x);
+    x = take(1, 81, 100, 500, 600, &n); /* A5 */
+    lag = period(x, n, 40, 70);
+    fprintf(stderr, "  steel A5 lag %d\n", lag);
+    near(lag, 50, 2, "steel A5 period");
+    free(x);
+}
+
+static void test_pluck_decay_and_tone(void)
+{
+    uint32_t n = 0;
+    int16_t *harp = take(3, 60, 100, 1500, 1600, &n);
+    int16_t *mute = take(2, 60, 100, 1500, 1600, &n);
+    int64_t he = energy(harp, n / 2, n / 2 + PM_FS / 4);
+    int64_t me = energy(mute, n / 2, n / 2 + PM_FS / 4);
+    fprintf(stderr, "  harp mid %lld mute mid %lld\n", (long long)he, (long long)me);
+    expect(he > me * 4, "harp rings longer than mute");
+    free(harp);
+    free(mute);
+
+    pm_init();
+    pm_load_preset(1);
+    pm_set_param(PM_BRIGHT, 8);
+    {
+        uint32_t total = PM_FS / 2, done = 0;
+        int16_t *dark = calloc(total, 2);
+        int16_t *bright;
+        int32_t buf[256 * 2];
+        pm_note_on(64, 110);
+        while (done < total) {
+            uint32_t i, c = 256;
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++)
+                dark[done + i] = (int16_t)buf[2 * i];
+            done += c;
+        }
+        pm_init();
+        pm_load_preset(1);
+        pm_set_param(PM_BRIGHT, 127);
+        bright = calloc(total, 2);
+        done = 0;
+        pm_note_on(64, 110);
+        while (done < total) {
+            uint32_t i, c = 256;
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++)
+                bright[done + i] = (int16_t)buf[2 * i];
+            done += c;
+        }
+        {
+            int64_t hd = hf(dark, PM_FS / 20, PM_FS / 5);
+            int64_t hb = hf(bright, PM_FS / 20, PM_FS / 5);
+            fprintf(stderr, "  hf dark %lld bright %lld\n", (long long)hd, (long long)hb);
+            expect(hb > hd * 12 / 10, "brighter pluck has more HF");
+        }
+        free(dark);
+        free(bright);
+    }
+}
+
+static void test_pick_changes(void)
+{
+    uint32_t total = PM_FS / 3, done;
+    int16_t *a = calloc(total, 2), *b = calloc(total, 2);
+    int32_t buf[256 * 2];
+    int64_t diff = 0, denom = 0;
+    uint32_t i;
+    pm_init();
+    pm_load_preset(0);
+    pm_set_param(PM_POS, 8);
+    pm_set_param(PM_COLOR, 127);
+    pm_note_on(67, 100);
+    for (done = 0; done < total;) {
+        uint32_t c = 256;
+        if (c > total - done)
+            c = total - done;
+        zero(buf, c * 2);
+        pm_render(buf, c);
+        for (i = 0; i < c; i++)
+            a[done + i] = (int16_t)buf[2 * i];
+        done += c;
+    }
+    pm_init();
+    pm_load_preset(0);
+    pm_set_param(PM_POS, 120);
+    pm_set_param(PM_COLOR, 127);
+    pm_note_on(67, 100);
+    for (done = 0; done < total;) {
+        uint32_t c = 256;
+        if (c > total - done)
+            c = total - done;
+        zero(buf, c * 2);
+        pm_render(buf, c);
+        for (i = 0; i < c; i++)
+            b[done + i] = (int16_t)buf[2 * i];
+        done += c;
+    }
+    for (i = 0; i < total; i++) {
+        int32_t d = (int32_t)a[i] - b[i];
+        diff += (int64_t)d * d;
+        denom += (int64_t)a[i] * a[i] + 1;
+    }
+    fprintf(stderr, "  pick diff/energy %lld\n", (long long)(diff / (denom / 1000 + 1)));
+    expect(diff > denom / 20, "pick position changes the pluck");
+    free(a);
+    free(b);
+}
+
+static void test_modal(void)
+{
+    uint32_t n = 0;
+    int16_t *bell = take(6, 69, 100, 1000, 1100, &n);
+    int16_t *drum = take(8, 69, 110, 800, 900, &n);
+    int lag = period(bell, n, 80, 140);
+    int64_t be = energy(bell, n / 3, n / 3 + PM_FS / 5);
+    int64_t de = energy(drum, n / 3, n / 3 + PM_FS / 5);
+    fprintf(stderr, "  bell lag %d bellE %lld drumE %lld\n", lag, (long long)be, (long long)de);
+    near(lag, 100, 3, "bell A4 period");
+    expect(be > de * 3, "bell rings longer than drum");
+    expect(peak(bell, n) > 800, "bell is audible");
+    free(bell);
+    free(drum);
+
+    {
+        int16_t *bar = take(4, 72, 100, 700, 800, &n); /* marimba C5 */
+        lag = period(bar, n, 50, 90);
+        fprintf(stderr, "  marimba C5 lag %d peak %d\n", lag, peak(bar, n));
+        near(lag, 84, 3, "marimba C5 period"); /* MIDI 72 = 523.25 Hz, 44100/523.25 ≈ 84.3 */
+        free(bar);
+    }
+}
+
+static void test_bow_and_reed(void)
+{
+    uint32_t n = 0;
+    int16_t *bow = take(10, 69, 110, 900, 1400, &n);
+    uint32_t a = PM_FS / 10, b = PM_FS / 4, c = PM_FS / 2, d = (uint32_t)(PM_FS * 0.7);
+    int64_t early = energy(bow, a, b);
+    int64_t mid = energy(bow, c, d);
+    int64_t tail = energy(bow, (uint32_t)(PM_FS * 1.1), (uint32_t)(PM_FS * 1.25));
+    int lag = period(bow, PM_FS / 2, 80, 140);
+    fprintf(stderr, "  bow early %lld mid %lld tail %lld lag %d peak %d\n",
+            (long long)early, (long long)mid, (long long)tail, lag, peak(bow, n));
+    expect(early > 20000, "bow speaks");
+    expect(mid * 2 > early, "bow sustains while held");
+    expect(tail * 5 < mid + 1, "bow decays after release");
+    near(lag, 100, 3, "bow A4 period");
+    free(bow);
+
+    {
+        int16_t *cl = take(12, 69, 100, 700, 800, &n);
+        int16_t *fl = take(13, 69, 100, 700, 800, &n);
+        int lc = period(cl, n, 70, 150);
+        int lf = period(fl, n, 70, 150);
+        fprintf(stderr, "  clar lag %d peak %d  flute lag %d peak %d\n", lc, peak(cl, n), lf, peak(fl, n));
+        near(lc, 100, 4, "clarinet A4 period");
+        near(lf, 100, 4, "flute A4 period");
+        expect(peak(cl, n) > 400 && peak(fl, n) > 400, "winds are audible");
+        expect(hash_pcm(cl, n) != hash_pcm(fl, n), "clarinet and flute differ");
+        free(cl);
+        free(fl);
+    }
+}
+
+static void test_poly_and_bounds(void)
+{
+    int32_t buf[256 * 2];
+    uint32_t block, i;
+    int32_t pk = 0;
+    const uint8_t notes[6] = {60, 64, 67, 72, 76, 79};
+    pm_init();
+    pm_load_preset(6); /* bell, the densest stack */
+    for (i = 0; i < 6; i++)
+        pm_note_on(notes[i], 120);
+    for (block = 0; block < PM_FS / 256; block++) {
+        zero(buf, 512);
+        pm_render(buf, 256);
+        for (i = 0; i < 512; i++) {
+            int32_t a = buf[i] < 0 ? -buf[i] : buf[i];
+            if (buf[i] > 32767 || buf[i] < -32767)
+                expect(0, "mix stayed inside int16");
+            if (a > pk)
+                pk = a;
+        }
+    }
+    fprintf(stderr, "  poly peak %d\n", pk);
+    expect(pk > 1000, "chord is audible");
+    pm_panic();
+    zero(buf, 512);
+    pm_render(buf, 256);
+    pm_render(buf, 256);
+    expect(pm_quiet(), "panic goes quiet");
+}
+
+static void test_bend(void)
+{
+    uint32_t total = PM_FS / 2, done, i;
+    int16_t *up = calloc(total, 2);
+    int32_t buf[256 * 2];
+    int lag0, lag1;
+    pm_init();
+    pm_load_preset(1);
+    pm_set_bend(65536);
+    pm_note_on(69, 100);
+    for (done = 0; done < total;) {
+        uint32_t c = 256;
+        if (c > total - done)
+            c = total - done;
+        zero(buf, c * 2);
+        pm_render(buf, c);
+        for (i = 0; i < c; i++)
+            up[done + i] = (int16_t)buf[2 * i];
+        done += c;
+    }
+    lag0 = period(up, total, 80, 140);
+    pm_init();
+    pm_load_preset(1);
+    pm_set_bend(73562); /* +2 semitones */
+    pm_note_on(69, 100);
+    for (done = 0; done < total;) {
+        uint32_t c = 256;
+        if (c > total - done)
+            c = total - done;
+        zero(buf, c * 2);
+        pm_render(buf, c);
+        for (i = 0; i < c; i++)
+            up[done + i] = (int16_t)buf[2 * i];
+        done += c;
+    }
+    lag1 = period(up, total, 70, 140);
+    fprintf(stderr, "  bend lags %d -> %d\n", lag0, lag1);
+    expect(lag1 < lag0 - 5, "bend up shortens the period");
+    free(up);
+}
+
+static void test_determinism_and_presets(void)
+{
+    uint32_t n = 0, i;
+    int16_t *a = take(0, 64, 90, 300, 400, &n);
+    int16_t *b = take(0, 64, 90, 300, 400, &n);
+    uint32_t ha = hash_pcm(a, n), hb = hash_pcm(b, n);
+    expect(ha == hb, "same notes render the same samples");
+    free(a);
+    free(b);
+    a = take(0, 64, 90, 300, 400, &n);
+    b = take(4, 64, 90, 300, 400, &n);
+    expect(hash_pcm(a, n) != hash_pcm(b, n), "nylon and marimba differ");
+    free(a);
+    free(b);
+    /* every preset, both param extremes: finite, not stuck at full scale */
+    for (i = 0; i < PM_NPRESET; i++) {
+        int16_t *x = take((uint8_t)i, 60, 100, 200, 350, &n);
+        int32_t pk = peak(x, n);
+        char msg[64];
+        snprintf(msg, sizeof msg, "preset %u audible", i);
+        expect(pk > 200 && pk <= 32767, msg);
+        free(x);
+    }
+}
+
+static void test_level_and_panic_noteoff(void)
+{
+    uint32_t n = 0;
+    int16_t *loud, *quiet;
+    pm_init();
+    pm_load_preset(0);
+    pm_set_param(PM_LEVEL, 127);
+    loud = take(0, 60, 120, 200, 300, &n);
+    /* take() calls pm_init, so set level inside a manual render instead */
+    free(loud);
+    {
+        uint32_t total = PM_FS / 4, done, i;
+        int32_t buf[256 * 2];
+        int64_t el = 0, eq = 0;
+        int16_t *L = calloc(total, 2), *Q = calloc(total, 2);
+        pm_init();
+        pm_load_preset(0);
+        pm_set_param(PM_LEVEL, 127);
+        pm_note_on(60, 110);
+        for (done = 0; done < total;) {
+            uint32_t c = 256;
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++)
+                L[done + i] = (int16_t)buf[2 * i];
+            done += c;
+        }
+        pm_init();
+        pm_load_preset(0);
+        pm_set_param(PM_LEVEL, 8);
+        pm_note_on(60, 110);
+        for (done = 0; done < total;) {
+            uint32_t c = 256;
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++)
+                Q[done + i] = (int16_t)buf[2 * i];
+            done += c;
+        }
+        el = energy(L, total / 5, total / 2);
+        eq = energy(Q, total / 5, total / 2);
+        fprintf(stderr, "  level energy %lld vs %lld\n", (long long)el, (long long)eq);
+        expect(el > eq * 8, "level knob scales loudness");
+        free(L);
+        free(Q);
+    }
+    quiet = take(1, 69, 100, 40, 500, &n);
+    {
+        int64_t early = energy(quiet, PM_FS / 50, PM_FS / 20);
+        int64_t late = energy(quiet, PM_FS / 5, PM_FS / 3);
+        fprintf(stderr, "  noteoff early %lld late %lld\n", (long long)early, (long long)late);
+        expect(early > late * 2, "note-off damps a pluck");
+    }
+    free(quiet);
+}
+
+int main(void)
+{
+    test_silence();
+    test_pluck_pitch();
+    test_pluck_decay_and_tone();
+    test_pick_changes();
+    test_modal();
+    test_bow_and_reed();
+    test_poly_and_bounds();
+    test_bend();
+    test_determinism_and_presets();
+    test_level_and_panic_noteoff();
+    if (fails) {
+        fprintf(stderr, "%d failure(s)\n", fails);
+        return 1;
+    }
+    printf("pm tests passed\n");
+    return 0;
+}
