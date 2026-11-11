@@ -1,7 +1,7 @@
-# Dinghy: build the packages on GitHub, run the host tests, and on a tag vX.Y publish the release with a build
-# attestation (actions/attest-build-provenance): the Firmware Hub shows "Built from source" for exactly these files.
-# The JieLi toolchain comes from pkgman.jieliapp.com (tools/get_toolchain.sh), the AC79 SDK from gitee.com, as in
-# sloopDX's and OberVave's workflows. Run by hand (workflow_dispatch) for a test build without a release.
+# XianQiang: on a tag vX.Y, build the FM-1 and SMK-37 packages and attach xianqiang-*.fwsc
+# to the GitHub Release. The JieLi toolchain and AC79 SDK are fetched in CI (Apache-2.0 SDK
+# blobs are packed into the .fwsc; they are not stored in the git tree). workflow_dispatch
+# builds without publishing a release.
 name: release
 
 on:

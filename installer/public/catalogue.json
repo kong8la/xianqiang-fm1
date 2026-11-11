@@ -12,7 +12,7 @@
       "summary": "六复音物理建模：拨弦、木棒、钟、鼓膜、拉弦和单簧管/长笛。认 Puya 与 UC25HQ80。",
       "license": "GPL-3.0-only",
       "version": "0.1",
-      "source": null,
+      "source": "https://github.com/kong8la/xianqiang-fm1",
       "flash": "new",
       "product": "FM-1_941",
       "sha256": "07f5daebfd317596c02d280c4238dc7e9064bbc31510c22df1ae88eaf346793c",

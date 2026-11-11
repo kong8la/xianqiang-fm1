@@ -13,6 +13,7 @@ import {
   parseRequest,
   preparePackage,
   productOf,
+  sitePath,
   response,
   sha256Hex,
   unpack7,
@@ -80,6 +81,14 @@ describe("package", () => {
 
   it("pins the official V15 hash", () => {
     expect(V15_SHA256).toHaveLength(64);
+  });
+});
+
+describe("pages base path", () => {
+  it("keeps catalogue and package URLs under the project site", () => {
+    expect(sitePath("/xianqiang-fm1/", "catalogue.json")).toBe("/xianqiang-fm1/catalogue.json");
+    expect(sitePath("/xianqiang-fm1/", "pkg/xianqiang-0.1.fwsc")).toBe("/xianqiang-fm1/pkg/xianqiang-0.1.fwsc");
+    expect(sitePath("./", "pkg/dinghy.fwsc")).toBe("./pkg/dinghy.fwsc");
   });
 });
 

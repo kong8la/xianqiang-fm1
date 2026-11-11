@@ -1,0 +1,77 @@
+# Build the static installer and publish it to GitHub Pages.
+# Live site: https://kong8la.github.io/xianqiang-fm1/
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "installer/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: installer/package-lock.json
+
+      - name: Test
+        working-directory: installer
+        run: npm ci && npm test
+
+      - name: Build for GitHub Pages
+        working-directory: installer
+        env:
+          GITHUB_PAGES: "true"
+        run: npm run build
+
+      - name: Mirrored packages are in the site
+        run: |
+          test -f installer/dist/catalogue.json
+          test -f installer/dist/pkg/xianqiang-0.1.fwsc
+          test -f installer/dist/pkg/FM-1_015.fwsc
+          python3 - << 'PY'
+          import hashlib, json
+          from pathlib import Path
+          doc = json.loads(Path("installer/dist/catalogue.json").read_text())
+          entries = doc["firmwares"] + [doc["official"]]
+          for e in entries:
+              blob = Path("installer/dist") / e["file"]
+              digest = hashlib.sha256(blob.read_bytes()).hexdigest()
+              if digest != e["sha256"]:
+                  raise SystemExit(f"{e['id']} sha {digest} != {e['sha256']}")
+              if not e["file"].startswith("pkg/"):
+                  raise SystemExit(f"{e['id']} file path {e['file']} is not under pkg/")
+          print(f"sha256 ok for {len(entries)} packages")
+          PY
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: installer/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

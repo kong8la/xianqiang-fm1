@@ -1,5 +1,5 @@
 import { MockFm1 } from "./mock";
-import { flashDecision, preparePackage, type ChipChoice, type FlashSupport, type Identity } from "./protocol";
+import { flashDecision, preparePackage, sitePath, type ChipChoice, type FlashSupport, type Identity } from "./protocol";
 import { handshake, installPackage, type MidiIo, type Progress } from "./session";
 import { findFm1 } from "./webmidi";
 
@@ -324,7 +324,7 @@ async function runInstall(entry: Entry, acknowledged: boolean) {
   state.dialog = { title: `安装 ${entry.name}`, body: "正在下载并核对 SHA-256…", percent: 4 };
   render();
   try {
-    const res = await fetch(entry.file);
+    const res = await fetch(sitePath(import.meta.env.BASE_URL, entry.file));
     if (!res.ok) throw new Error(`下载失败（${res.status}）`);
     const raw = new Uint8Array(await res.arrayBuffer());
     const prepared = await preparePackage(raw, entry.sha256);
@@ -374,7 +374,7 @@ function progressDialog(name: string, p: Progress): NonNullable<typeof state.dia
 async function main() {
   render();
   try {
-    const res = await fetch(new URL("catalogue.json", document.baseURI));
+    const res = await fetch(sitePath(import.meta.env.BASE_URL, "catalogue.json"));
     if (!res.ok) throw new Error(String(res.status));
     state.cat = (await res.json()) as Catalogue;
   } catch {

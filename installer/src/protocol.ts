@@ -319,6 +319,12 @@ export type ChipChoice = "unknown" | "856014" | "B36014";
 export type FlashSupport = "new" | "old" | "any";
 
 /** new = 认 0xB36014；old = 只认 Puya；any = 两者都可以。 */
+/** Join a Vite base (`./` or `/xianqiang-fm1/`) with a catalogue file path. */
+export function sitePath(base: string, file: string): string {
+  const root = base.endsWith("/") ? base : `${base}/`;
+  return root + file.replace(/^\//, "");
+}
+
 export function flashDecision(support: FlashSupport, chip: ChipChoice): "ok" | "refuse" | "warn" {
   if (support !== "old") return "ok";
   if (chip === "B36014") return "refuse";

@@ -1,6 +1,8 @@
 # 弦腔安装器
 
-在 Chrome 或 Edge 里给 M-VAVE FM-1 换固件的静态网页。走的是和 M-VAVE 更新器相同的 USB-MIDI SysEx：正在运行的固件先把包里的更新加载器读走并启动，加载器再把整包写进应用区。这个页面只回答设备的读取请求，不直接写闪存地址。
+线上地址：[https://kong8la.github.io/xianqiang-fm1/](https://kong8la.github.io/xianqiang-fm1/)
+
+在 Chrome 或 Edge 里给 M-VAVE FM-1 换固件的静态网页。走的是和 M-VAVE 更新器相同的 USB-MIDI SysEx：正在运行的固件先把包里的更新加载器读走并启动，加载器再把整包写进应用区。这个页面只回答设备的读取请求，不直接写闪存地址。源码仓库：[kong8la/xianqiang-fm1](https://github.com/kong8la/xianqiang-fm1)。
 
 ## 本地看
 
@@ -18,18 +20,21 @@ npm run dev                          # http://127.0.0.1:43127
 
 ## 部署
 
-任意静态托管都可以。构建：
+推到 `main` 后，`.github/workflows/pages.yml` 会跑测试、以 `GITHUB_PAGES=true` 构建（Vite `base` 为 `/xianqiang-fm1/`），核对 `installer/dist/pkg/` 里每个包的 SHA-256 仍与目录一致，再用 `actions/upload-pages-artifact` 和 `actions/deploy-pages` 发到 GitHub Pages。页面和 `pkg/*.fwsc` 同源，哈希校验不依赖 GitHub Release 的跨域头。
+
+第一次要在仓库里打开 Pages，来源选 **GitHub Actions**（Settings → Pages → Build and deployment → Source）。仓库需为公开，免费计划才能用 Pages。私有仓库要付费计划，否则 Actions 部署会被拒。
+
+也可以自己托管 `installer/dist/`：
 
 ```sh
 cd installer
-npm run build          # 输出 installer/dist/ ，里面已经带上 catalogue.json 和 pkg/
+npm test
+GITHUB_PAGES=true npm run build    # 给 kong8la.github.io/xianqiang-fm1/
+npm run build                       # 本地或网站根目录，base 为 ./
 ```
 
-把 `installer/dist/` 整份放到网站根目录。
-
-- **GitHub Pages**：仓库 Settings → Pages → 从 GitHub Actions 或 `installer/dist` 发布。`vite.config.ts` 里 `base` 是 `./`，放在子路径也能打开。
-- **Vercel / Netlify / Cloudflare Pages**：根目录设为 `installer`，构建命令 `npm run build`，输出目录 `dist`。
-- **自己的 nginx**：`root` 指到 `dist`，对 `.fwsc` 使用默认的二进制类型即可。页面和安装包同源，不依赖 GitHub 的跨域头。
+- **Vercel / Netlify / Cloudflare Pages**：根目录设为 `installer`，构建命令 `npm run build`，输出目录 `dist`。若站点不在域名根路径，把构建环境变量 `GITHUB_PAGES` 设成 `true`，或改 `vite.config.ts` 里的 `base`。
+- **自己的 nginx**：`root` 指到 `dist`。`.fwsc` 用默认二进制类型即可。
 
 GitHub Release 的下载地址会 302 到 `release-assets.githubusercontent.com`，响应里没有 `Access-Control-Allow-Origin`，浏览器里的页面不能直接去拉。所以可再分发的包放在 `public/pkg/`，由 `scripts/fetch-catalogue.py` 从各仓库的最新 Release 下载并计算 SHA-256。官方 V15 来自 `m-vave/fm1_open` 提交 `b178ac4` 的 `sdk/firmware/FM-1_015.fwsc`，哈希必须是 `db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`。
 
