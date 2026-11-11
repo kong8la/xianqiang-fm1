@@ -21,6 +21,7 @@
  * is the only writer of voice state, via a small command queue. */
 #include "pm.h"
 #include "pm_tables.h"
+#include "pm_fx.h"
 
 #if defined(DINGHY_HOST) || defined(PM_NO_POOL)
 #define PM_MEM
@@ -76,38 +77,38 @@ static struct {
 static volatile uint32_t cmd_w, cmd_r;
 
 static const pm_preset_t PRESETS[PM_NPRESET] = {
-    {"NYLON", "PLUCK", PM_PLUCK, 112, 72, 46, 90, 36},
-    {"STEEL", "PLUCK", PM_PLUCK, 122, 118, 24, 110, 64},
-    {"MUTE", "PLUCK", PM_PLUCK, 28, 48, 70, 40, 24},
-    {"HARP", "PLUCK", PM_PLUCK, 126, 96, 16, 70, 18},
-    {"MARIMBA", "BAR", PM_BAR, 108, 100, 78, 28, 48},
-    {"XYLO", "BAR", PM_BAR, 86, 122, 60, 48, 70},
-    {"BELL", "BELL", PM_BELL, 124, 112, 42, 18, 30},
-    {"CHIME", "BELL", PM_BELL, 116, 78, 28, 8, 16},
-    {"DRUM", "MEMB", PM_MEMB, 24, 96, 50, 20, 100},
-    {"FRAME", "MEMB", PM_MEMB, 58, 64, 64, 12, 46},
-    {"VIOLIN", "BOW", PM_BOW, 112, 100, 36, 100, 78},
-    {"CELLO", "BOW", PM_BOW, 118, 62, 48, 80, 52},
-    {"CLARINET", "REED", PM_REED, 100, 74, 40, 22, 48},
-    {"FLUTE", "REED", PM_REED, 108, 96, 56, 100, 28},
-    {"GUT", "PLUCK", PM_PLUCK, 100, 60, 55, 80, 20},
-    {"BANJO", "PLUCK", PM_PLUCK, 70, 120, 90, 127, 80},
-    {"DULC", "PLUCK", PM_PLUCK, 118, 100, 30, 100, 40},
-    {"VIBES", "BAR", PM_BAR, 120, 90, 40, 20, 30},
-    {"WOOD", "BAR", PM_BAR, 90, 110, 70, 60, 55},
-    {"TUBES", "BELL", PM_BELL, 126, 80, 50, 30, 20},
-    {"GLOCK", "BELL", PM_BELL, 80, 120, 60, 40, 70},
-    {"TOM", "MEMB", PM_MEMB, 40, 70, 40, 30, 90},
-    {"CONGA", "MEMB", PM_MEMB, 36, 88, 80, 16, 70},
-    {"BASS", "BOW", PM_BOW, 120, 40, 60, 90, 40},
-    {"VIOLA", "BOW", PM_BOW, 100, 90, 30, 110, 90},
-    {"OBOE", "REED", PM_REED, 90, 80, 36, 18, 60},
-    {"SHAKU", "REED", PM_REED, 110, 70, 50, 110, 20},
-    {"PIZZ", "PLUCK", PM_PLUCK, 40, 100, 40, 70, 50},
-    {"LYRE", "PLUCK", PM_PLUCK, 124, 84, 20, 60, 14},
-    {"TEMPLE", "BELL", PM_BELL, 100, 60, 30, 10, 12},
-    {"TABLA", "MEMB", PM_MEMB, 18, 110, 55, 40, 120},
-    {"SOLO", "BOW", PM_BOW, 108, 115, 28, 120, 100},
+    {"NYLON", "PLUCK", PM_PLUCK, 112, 72, 46, 90, 36, 0, 0, 0, 0},
+    {"STEEL", "PLUCK", PM_PLUCK, 122, 118, 24, 110, 64, 0, 0, 0, 0},
+    {"MUTE", "PLUCK", PM_PLUCK, 28, 48, 70, 40, 24, 0, 0, 0, 0},
+    {"HARP", "PLUCK", PM_PLUCK, 126, 96, 16, 70, 18, 0, 0, 0, 0},
+    {"MARIMBA", "BAR", PM_BAR, 108, 100, 78, 28, 48, 0, 0, 0, 0},
+    {"XYLO", "BAR", PM_BAR, 86, 122, 60, 48, 70, 0, 0, 0, 0},
+    {"BELL", "BELL", PM_BELL, 124, 112, 42, 18, 30, 0, 0, 0, 0},
+    {"CHIME", "BELL", PM_BELL, 116, 78, 28, 8, 16, 0, 0, 0, 0},
+    {"DRUM", "MEMB", PM_MEMB, 24, 96, 50, 20, 100, 0, 0, 0, 0},
+    {"FRAME", "MEMB", PM_MEMB, 58, 64, 64, 12, 46, 0, 0, 0, 0},
+    {"VIOLIN", "BOW", PM_BOW, 112, 100, 36, 100, 78, 0, 0, 0, 0},
+    {"CELLO", "BOW", PM_BOW, 118, 62, 48, 80, 52, 0, 0, 0, 0},
+    {"CLARINET", "REED", PM_REED, 100, 74, 40, 22, 48, 0, 0, 0, 0},
+    {"FLUTE", "REED", PM_REED, 108, 96, 56, 100, 28, 0, 0, 0, 0},
+    {"GUT", "PLUCK", PM_PLUCK, 100, 60, 55, 80, 20, 0, 0, 0, 0},
+    {"BANJO", "PLUCK", PM_PLUCK, 70, 120, 90, 127, 80, 0, 0, 0, 0},
+    {"DULC", "PLUCK", PM_PLUCK, 118, 100, 30, 100, 40, 0, 0, 0, 0},
+    {"VIBES", "BAR", PM_BAR, 120, 90, 40, 20, 30, PM_FX_REV, 48, 80, 60},
+    {"WOOD", "BAR", PM_BAR, 90, 110, 70, 60, 55, 0, 0, 0, 0},
+    {"TUBES", "BELL", PM_BELL, 126, 80, 50, 30, 20, PM_FX_REV, 56, 90, 70},
+    {"GLOCK", "BELL", PM_BELL, 80, 120, 60, 40, 70, 0, 0, 0, 0},
+    {"TOM", "MEMB", PM_MEMB, 40, 70, 40, 30, 90, 0, 0, 0, 0},
+    {"CONGA", "MEMB", PM_MEMB, 36, 88, 80, 16, 70, 0, 0, 0, 0},
+    {"BASS", "BOW", PM_BOW, 120, 40, 60, 90, 40, 0, 0, 0, 0},
+    {"VIOLA", "BOW", PM_BOW, 100, 90, 30, 110, 90, 0, 0, 0, 0},
+    {"OBOE", "REED", PM_REED, 90, 80, 36, 18, 60, 0, 0, 0, 0},
+    {"SHAKU", "REED", PM_REED, 110, 70, 50, 110, 20, PM_FX_DLY, 36, 48, 40},
+    {"PIZZ", "PLUCK", PM_PLUCK, 40, 100, 40, 70, 50, 0, 0, 0, 0},
+    {"LYRE", "PLUCK", PM_PLUCK, 124, 84, 20, 60, 14, PM_FX_CHO, 40, 50, 30},
+    {"TEMPLE", "BELL", PM_BELL, 100, 60, 30, 10, 12, 0, 0, 0, 0},
+    {"TABLA", "MEMB", PM_MEMB, 18, 110, 55, 40, 120, 0, 0, 0, 0},
+    {"SOLO", "BOW", PM_BOW, 108, 115, 28, 120, 100, 0, 0, 0, 0},
 };
 
 static const char *const PNAME_PLUCK[6] = {"DECAY", "TONE", "PICK", "BODY", "NOISE", "LEVEL"};
@@ -192,6 +193,7 @@ void pm_load_preset(uint8_t index)
     g_param[PM_POS] = p->pos;
     g_param[PM_COLOR] = p->color;
     g_param[PM_EXCITE] = p->excite;
+    pm_fx_set(p->fx, p->fx_mix, p->fx_time, p->fx_fb);
 }
 
 void pm_init(void)
@@ -218,6 +220,7 @@ void pm_init(void)
     pm_load_preset(0);
     g_param[PM_LEVEL] = 96;
     cmd_w = cmd_r = 0;
+    pm_fx_init();
     g_ready = 1;
 }
 
@@ -831,6 +834,7 @@ void pm_render(int32_t *out, uint32_t n)
                     voice->alive = 0;
             }
         }
+        pm_fx_process(&acc_l, &acc_r);
         out[2u * i] += pm_soft(acc_l);
         out[2u * i + 1u] += pm_soft(acc_r);
     }
@@ -842,3 +846,5 @@ void pm_render(int32_t *out, uint32_t n)
         g_sounding = any;
     }
 }
+
+#include "pm_fx.c"

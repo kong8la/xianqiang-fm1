@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "pm_user.h"
 #include "pm.h"
+#include "pm_fx.h"
 #include <string.h>
 
 static uint32_t crc32(const uint8_t *p, uint32_t n)
@@ -148,6 +149,7 @@ void pm_user_store_current(pm_user_bank_t *b, uint8_t slot, const char *name)
     s->model = pm_model();
     for (i = 0; i < PM_NPARAM && i < 6u; i++)
         s->p[i] = pm_get_param((uint8_t)i);
+    pm_fx_get(&s->fx_kind, &s->fx_mix, &s->fx_time, &s->fx_fb);
     if (!name || !name[0])
         name = "USER";
     for (i = 0; i < 7u && name[i]; i++)
@@ -173,5 +175,6 @@ int pm_user_recall(const pm_user_bank_t *b, uint8_t slot)
         pm_set_param((uint8_t)i, s->p[i]);
     }
     pm_set_param(PM_LEVEL, level);
+    pm_fx_set(s->fx_kind, s->fx_mix, s->fx_time, s->fx_fb);
     return 0;
 }

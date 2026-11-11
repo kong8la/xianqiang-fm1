@@ -371,6 +371,20 @@ static void app_main(void)
         }
         if (b & (1u << BTN_HOME))
             pm_panic();
+        if (b & (1u << BTN_FX)) {
+            uint8_t k, m, t, f;
+            pm_fx_get(&k, &m, &t, &f);
+            k = (uint8_t)((k + 1u) % PM_FX_N);
+            if (!m)
+                m = 64;
+            if (!t)
+                t = 72;
+            if (!f)
+                f = 48;
+            pm_fx_set(k, m, t, f);
+            dirty = 1;
+            t_change = fm1_ms;
+        }
         if (b & (1u << BTN_LFO)) {
             user_mode = (uint8_t)!user_mode;
             if (user_mode)
@@ -415,6 +429,7 @@ static void app_main(void)
         midi_in();
         if (clk_bpm && fm1_ms - clk_t0 > 2000u)
             clk_bpm = 0, clk_run = 0;
+        pm_fx_set_bpm((uint16_t)clk_bpm);
 
         oct = set.oct;
         base = (uint32_t)((int32_t)KEY0 + 12 * oct);
@@ -488,9 +503,9 @@ static void app_main(void)
             draw_text_box(0, 40, 240, &FONT_S, line, C_ACC, 1);
         }
         if (lit != lit_drawn) { lit_drawn = lit; draw_keys(lit); }
-        st = (uint32_t)(oct + 2) | ((uint32_t)set.ch << 4) | (clk_bpm << 12) | (set.latch << 20) | (midi_sus << 21) | (midi_src << 22);
+        st = (uint32_t)(oct + 2) | ((uint32_t)set.ch << 4) | (clk_bpm << 12) | (set.latch << 20) | (midi_sus << 21) | (midi_src << 22) | ((uint32_t)pm_fx_kind() << 28);
         if (st != status_drawn) {
-            char s[32];
+            char s[40];
             uint32_t i = 0;
             const char *p = "OCT ";
             status_drawn = st;
@@ -515,6 +530,11 @@ static void app_main(void)
                 p = midi_src == 2u ? " TRS" : " USB";
                 while (*p)
                     s[i++] = *p++;
+            }
+            if (pm_fx_kind()) {
+                const char *fxn = pm_fx_kind() == PM_FX_REV ? " REV" : pm_fx_kind() == PM_FX_DLY ? " DLY" : " CHO";
+                while (*fxn && i < 30u)
+                    s[i++] = *fxn++;
             }
             if (clk_bpm) {
                 s[i++] = ' ';

@@ -36,6 +36,7 @@ typedef struct {
     const char *kind;   /* PLUCK, BAR, BELL, MEMB, BOW, REED */
     uint8_t model;
     uint8_t decay, bright, pos, color, excite;
+    uint8_t fx, fx_mix, fx_time, fx_fb;         /* 0 fills when an older line omits them */
 } pm_preset_t;
 
 const pm_preset_t *pm_presets(void);

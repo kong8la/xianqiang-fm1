@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Host tests for the physical-modeling core. No hardware, no float in the DSP. */
 #include "pm.h"
+#include "pm_fx.h"
 #include "pm_user.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -491,6 +492,56 @@ static void test_level_and_panic_noteoff(void)
     free(quiet);
 }
 
+static void test_fx(void)
+{
+    uint32_t n = 0, late_a, late_b;
+    int16_t *dry, *wet;
+    uint32_t i;
+    int32_t buf[256 * 2];
+    pm_init();
+    pm_load_preset(17);
+    expect(pm_fx_kind() == PM_FX_REV, "vibes preset opens the reverb");
+    dry = take(2, 60, 110, 40, 800, &n);
+    pm_init();
+    pm_load_preset(2);
+    pm_fx_set(PM_FX_DLY, 100, 64, 90);
+    pm_fx_set_bpm(0);
+    pm_note_on(60, 110);
+    {
+        uint32_t total = n, done = 0;
+        wet = calloc(total, sizeof(int16_t));
+        while (done < total) {
+            uint32_t c = 256;
+            if (done == PM_FS / 12)
+                pm_note_off(60);
+            if (c > total - done)
+                c = total - done;
+            zero(buf, c * 2);
+            pm_render(buf, c);
+            for (i = 0; i < c; i++) {
+                int32_t s = buf[2 * i];
+                if (s > 32767 || s < -32767)
+                    expect(0, "delay mix stayed in range");
+                wet[done + i] = (int16_t)s;
+            }
+            done += c;
+        }
+    }
+    late_a = (uint32_t)energy(dry, n * 2 / 3, n - 8);
+    late_b = (uint32_t)energy(wet, n * 2 / 3, n - 8);
+    fprintf(stderr, "  delay tail dry %u wet %u\n", late_a, late_b);
+    expect(late_b > late_a + 50, "delay leaves a tail");
+    expect(hash_pcm(dry, n) != hash_pcm(wet, n), "delay changes the take");
+    free(dry);
+    free(wet);
+    pm_init();
+    pm_fx_set(PM_FX_DLY, 80, 10, 40);
+    pm_fx_set_bpm(120);
+    pm_fx_set_bpm(0);
+    expect(pm_fx_kind() == PM_FX_DLY, "bpm update keeps the effect");
+    expect(pm_fx_ram() < 48u * 1024u, "effect memory stays under 48 KB");
+}
+
 static void test_user_bank(void)
 {
     pm_user_bank_t bank, got;
@@ -534,6 +585,7 @@ int main(void)
     test_bend();
     test_determinism_and_presets();
     test_level_and_panic_noteoff();
+    test_fx();
     test_user_bank();
     if (fails) {
         fprintf(stderr, "%d failure(s)\n", fails);
