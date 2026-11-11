@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Host tests for the physical-modeling core. No hardware, no float in the DSP. */
 #include "pm.h"
+#include "pm_user.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -490,6 +491,37 @@ static void test_level_and_panic_noteoff(void)
     free(quiet);
 }
 
+static void test_user_bank(void)
+{
+    pm_user_bank_t bank, got;
+    uint8_t a[PM_USER_BYTES], b[PM_USER_BYTES], bad[PM_USER_BYTES];
+    int src = 9;
+    const pm_preset_t *pr = pm_presets();
+    pm_init();
+    expect(PM_NPRESET == 32, "32 factory presets");
+    expect(strcmp(pr[0].name, "NYLON") == 0 && strcmp(pr[1].name, "STEEL") == 0, "first presets stay put");
+    expect(strcmp(pr[13].name, "FLUTE") == 0 && strcmp(pr[31].name, "SOLO") == 0, "last old and new presets");
+    pm_load_preset(15); /* BANJO */
+    pm_user_reset(&bank);
+    pm_user_store_current(&bank, 2, "BANJO");
+    expect(bank.slot[2].used && bank.slot[2].model == PM_PLUCK, "stored banjo");
+    pm_load_preset(0);
+    expect(pm_user_recall(&bank, 2) == 0, "recall used slot");
+    expect(pm_model() == PM_PLUCK && pm_get_param(PM_BRIGHT) == pr[15].bright, "recall restored tone");
+    expect(pm_user_recall(&bank, 0) != 0, "empty slot is not applied");
+    bank.seq = 1;
+    expect(pm_user_encode(&bank, a) == 0, "encode a");
+    bank.seq = 4;
+    bank.cur = 2;
+    expect(pm_user_encode(&bank, b) == 0, "encode b");
+    expect(pm_user_choose(a, PM_USER_BYTES, b, PM_USER_BYTES, &got, &src) == 0 && src == 1 && got.seq == 4, "newer copy wins");
+    memcpy(bad, b, sizeof bad);
+    bad[20] ^= 0x5a;
+    expect(pm_user_decode(bad, PM_USER_BYTES, &got) != 0, "corrupt crc rejected");
+    expect(pm_user_choose(bad, PM_USER_BYTES, bad, PM_USER_BYTES, &got, &src) != 0 && src == -1, "both corrupt falls back");
+    expect(!got.slot[2].used, "fallback bank is empty");
+}
+
 int main(void)
 {
     test_silence();
@@ -502,6 +534,7 @@ int main(void)
     test_bend();
     test_determinism_and_presets();
     test_level_and_panic_noteoff();
+    test_user_bank();
     if (fails) {
         fprintf(stderr, "%d failure(s)\n", fails);
         return 1;

@@ -10,7 +10,7 @@
 #define PM_FS 44100u
 #define PM_VOICES 6u
 #define PM_NPARAM 6u
-#define PM_NPRESET 14u
+#define PM_NPRESET 32u
 
 enum {
     PM_DECAY = 0,
@@ -43,6 +43,7 @@ const char *pm_param_name(uint8_t model, uint8_t param);
 
 void pm_init(void);
 void pm_load_preset(uint8_t index);                 /* sets model + five tone params; keeps level */
+void pm_set_model(uint8_t model);
 void pm_set_param(uint8_t param, uint8_t value);    /* 0..127 */
 uint8_t pm_get_param(uint8_t param);
 uint8_t pm_preset_index(void);

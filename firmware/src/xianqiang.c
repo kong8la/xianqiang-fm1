@@ -16,6 +16,7 @@ static void app_idle(void);
 #define LCD_IDLE app_idle
 #include "platform.c"
 #include "pm.c"
+#include "pm_user.c"
 #if BOARD_SMK37
 #include "smk_wheel.h"
 #endif
@@ -119,6 +120,32 @@ static void apply_set(void)
 
 static uint32_t idle_ok, midi_src, clk_n, clk_t0, clk_bpm, clk_run, clk_beat_ms;
 static uint8_t midi_sus;
+static pm_user_bank_t ubank;
+static int ubank_src = -1;
+static uint8_t user_mode, user_slot, save_wait;
+
+static void load_user_bank(void)
+{
+    uint8_t a[PM_USER_BYTES], b[PM_USER_BYTES];
+    int na = blob_load(0, a, PM_USER_BYTES) == 0;
+    int nb = blob_load(1, b, PM_USER_BYTES) == 0;
+    if (pm_user_choose(na ? a : 0, na ? PM_USER_BYTES : 0, nb ? b : 0, nb ? PM_USER_BYTES : 0, &ubank, &ubank_src) != 0)
+        pm_user_reset(&ubank);
+}
+
+/* Erases the spare blob sector (~50 ms, sound drops). Call only while quiet. */
+static void save_user_bank(void)
+{
+    uint8_t buf[PM_USER_BYTES];
+    int dest = ubank_src == 0 ? 1 : 0;
+    uint32_t seq = ubank.seq;
+    ubank.seq = seq + 1u;
+    if (pm_user_encode(&ubank, buf) != 0 || blob_save((uint32_t)dest, buf, PM_USER_BYTES) != 0) {
+        ubank.seq = seq;
+        return;
+    }
+    ubank_src = dest;
+}
 
 static void publish_sustain(void)
 {
@@ -247,6 +274,7 @@ static void app_main(void)
     smk_pad_events = 1;
 #endif
     pm_init();
+    load_user_bank();
     if (settings_load(&set, sizeof set) || set.oct < -2 || set.oct > 2 || set.ch > 16u || set.preset >= PM_NPRESET) {
         set.oct = 0;
         set.ch = 0;
@@ -343,16 +371,37 @@ static void app_main(void)
         }
         if (b & (1u << BTN_HOME))
             pm_panic();
+        if (b & (1u << BTN_LFO)) {
+            user_mode = (uint8_t)!user_mode;
+            if (user_mode)
+                pm_user_recall(&ubank, user_slot);
+        }
+        if (b & (1u << BTN_SAVE)) {
+            const char *nm = user_mode && ubank.slot[user_slot].used ? ubank.slot[user_slot].name : presets[pm_preset_index()].name;
+            pm_user_store_current(&ubank, user_slot, nm);
+            user_mode = 1;
+            save_wait = 1;
+        }
 
         if ((e = fm1_enc_take(ENC_PRESETS)) != 0) {
-            int32_t p = (int32_t)pm_preset_index() + e;
-            uint8_t level = pm_get_param(PM_LEVEL);
-            while (p < 0)
-                p += (int32_t)PM_NPRESET;
-            while (p >= (int32_t)PM_NPRESET)
-                p -= (int32_t)PM_NPRESET;
-            pm_load_preset((uint8_t)p);
-            pm_set_param(PM_LEVEL, level);
+            if (user_mode) {
+                int32_t s = (int32_t)user_slot + (e > 0 ? 1 : -1);
+                while (s < 0)
+                    s += (int32_t)PM_USER_N;
+                while (s >= (int32_t)PM_USER_N)
+                    s -= (int32_t)PM_USER_N;
+                user_slot = (uint8_t)s;
+                pm_user_recall(&ubank, user_slot);
+            } else {
+                int32_t p = (int32_t)pm_preset_index() + e;
+                uint8_t level = pm_get_param(PM_LEVEL);
+                while (p < 0)
+                    p += (int32_t)PM_NPRESET;
+                while (p >= (int32_t)PM_NPRESET)
+                    p -= (int32_t)PM_NPRESET;
+                pm_load_preset((uint8_t)p);
+                pm_set_param(PM_LEVEL, level);
+            }
             dirty = 1;
             t_change = fm1_ms;
         }
@@ -377,6 +426,8 @@ static void app_main(void)
         fm1_led_key(BTN_OCT_DOWN, oct < 0);
         fm1_led_key(BTN_OCT_UP, oct > 0);
         fm1_led_key(BTN_ENV, set.latch || midi_sus);
+        fm1_led_key(BTN_LFO, user_mode);
+        fm1_led_key(BTN_SAVE, save_wait);
         fm1_led_key(BTN_PLAY, clk_run || (clk_bpm && fm1_ms - clk_beat_ms < 80u));
 #if BOARD_SMK37
         for (k = 0; k < 16u; k++) {
@@ -398,7 +449,28 @@ static void app_main(void)
             note_drawn = pm_last_note();
             draw_text_box(0, 58, 240, &FONT_L, note, C_WARM, 1);
         }
-        if (pm_preset_index() != preset_drawn) {
+        if (user_mode) {
+            uint32_t tag = 0x80000000u | user_slot | ((uint32_t)ubank.slot[user_slot].used << 8) | ((uint32_t)save_wait << 9);
+            if (tag != preset_drawn) {
+                uint32_t i = 0;
+                const char *p = ubank.slot[user_slot].used ? ubank.slot[user_slot].name : "EMPTY";
+                preset_drawn = tag;
+                line[i++] = 'U';
+                line[i++] = (char)('1' + user_slot);
+                line[i++] = ' ';
+                while (*p && i < 16u)
+                    line[i++] = *p++;
+                if (save_wait && i < 22u) {
+                    line[i++] = ' ';
+                    line[i++] = 'S';
+                    line[i++] = 'A';
+                    line[i++] = 'V';
+                    line[i++] = 'E';
+                }
+                line[i] = 0;
+                draw_text_box(0, 40, 240, &FONT_S, line, C_ACC, 1);
+            }
+        } else if (pm_preset_index() != preset_drawn) {
             uint32_t i = 3;
             const char *p;
             preset_drawn = pm_preset_index();
@@ -456,6 +528,10 @@ static void app_main(void)
         }
         idle_ok = 0;
 
+        if (save_wait && pm_quiet()) {
+            save_user_bank();
+            save_wait = 0;
+        }
         if (dirty && pm_quiet() && fm1_ms - t_change > 2000u) {
             capture_set();
             settings_save(&set, sizeof set);

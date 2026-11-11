@@ -9,9 +9,9 @@ if grep -nE '(^|[^a-zA-Z_])(float|double)([^a-zA-Z_]|$)' dsp/pm.c dsp/pm.h >/dev
     echo "dsp uses float or double"
     exit 1
 fi
-$CC -o build/host/test_pm host/test_pm.c dsp/pm.c
+$CC -o build/host/test_pm host/test_pm.c dsp/pm.c dsp/pm_user.c
 build/host/test_pm
-if $CC -fsanitize=address,undefined -fno-sanitize-recover=undefined -o build/host/test_pm_san host/test_pm.c dsp/pm.c; then
+if $CC -fsanitize=address,undefined -fno-sanitize-recover=undefined -o build/host/test_pm_san host/test_pm.c dsp/pm.c dsp/pm_user.c; then
     build/host/test_pm_san
 else
     echo "sanitizer runtime not installed; functional tests already passed"

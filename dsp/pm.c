@@ -90,6 +90,24 @@ static const pm_preset_t PRESETS[PM_NPRESET] = {
     {"CELLO", "BOW", PM_BOW, 118, 62, 48, 80, 52},
     {"CLARINET", "REED", PM_REED, 100, 74, 40, 22, 48},
     {"FLUTE", "REED", PM_REED, 108, 96, 56, 100, 28},
+    {"GUT", "PLUCK", PM_PLUCK, 100, 60, 55, 80, 20},
+    {"BANJO", "PLUCK", PM_PLUCK, 70, 120, 90, 127, 80},
+    {"DULC", "PLUCK", PM_PLUCK, 118, 100, 30, 100, 40},
+    {"VIBES", "BAR", PM_BAR, 120, 90, 40, 20, 30},
+    {"WOOD", "BAR", PM_BAR, 90, 110, 70, 60, 55},
+    {"TUBES", "BELL", PM_BELL, 126, 80, 50, 30, 20},
+    {"GLOCK", "BELL", PM_BELL, 80, 120, 60, 40, 70},
+    {"TOM", "MEMB", PM_MEMB, 40, 70, 40, 30, 90},
+    {"CONGA", "MEMB", PM_MEMB, 36, 88, 80, 16, 70},
+    {"BASS", "BOW", PM_BOW, 120, 40, 60, 90, 40},
+    {"VIOLA", "BOW", PM_BOW, 100, 90, 30, 110, 90},
+    {"OBOE", "REED", PM_REED, 90, 80, 36, 18, 60},
+    {"SHAKU", "REED", PM_REED, 110, 70, 50, 110, 20},
+    {"PIZZ", "PLUCK", PM_PLUCK, 40, 100, 40, 70, 50},
+    {"LYRE", "PLUCK", PM_PLUCK, 124, 84, 20, 60, 14},
+    {"TEMPLE", "BELL", PM_BELL, 100, 60, 30, 10, 12},
+    {"TABLA", "MEMB", PM_MEMB, 18, 110, 55, 40, 120},
+    {"SOLO", "BOW", PM_BOW, 108, 115, 28, 120, 100},
 };
 
 static const char *const PNAME_PLUCK[6] = {"DECAY", "TONE", "PICK", "BODY", "NOISE", "LEVEL"};
@@ -153,6 +171,12 @@ void pm_set_bend(uint32_t bend_q16)
     if (bend_q16 > 76000u)
         bend_q16 = 76000u;
     g_bend = bend_q16;
+}
+
+void pm_set_model(uint8_t model)
+{
+    if (model < PM_NMODEL)
+        g_model = model;
 }
 
 void pm_load_preset(uint8_t index)
