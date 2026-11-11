@@ -1,5 +1,6 @@
 # Build the static installer and publish it to GitHub Pages.
 # Live site: https://kong8la.github.io/xianqiang-fm1/
+# Path filters below ignore empty commits, so a redeploy has to touch this file or installer/**.
 name: pages
 
 on:
