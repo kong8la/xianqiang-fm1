@@ -49,7 +49,7 @@ button.danger { background: var(--bad); color: #2a0d09; }
 .device strong { font-size: 18px; }
 .meta { color: var(--muted); margin: 4px 0 0; }
 .chip-pick { display: flex; flex-direction: column; gap: 6px; }
-.chip-pick select, .toolbar input {
+.chip-pick select {
   background: #100e0b;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -64,12 +64,7 @@ button.danger { background: var(--bad); color: #2a0d09; }
 }
 .banner strong { color: var(--amber-2); }
 
-.toolbar { display: flex; gap: 10px; margin: 18px 0; flex-wrap: wrap; }
-.toolbar input { flex: 1; min-width: 180px; }
-.filters { display: flex; gap: 6px; flex-wrap: wrap; }
-.filters button[aria-pressed="true"] { background: var(--ink); color: #1a140e; }
-
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 18px; }
 .card { padding: 16px; display: flex; flex-direction: column; gap: 8px; min-height: 210px; }
 .card.featured { grid-column: 1 / -1; background:
   radial-gradient(600px 120px at 0 0, rgba(231, 166, 74, 0.18), transparent 60%), var(--bg-2); }
@@ -84,6 +79,14 @@ button.danger { background: var(--bad); color: #2a0d09; }
 
 .rescue { margin-top: 22px; padding: 18px; }
 .rescue h2 { margin-top: 0; }
+.restore {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+}
+.restore h3 { margin: 0 0 6px; font-size: 15px; font-weight: 650; color: var(--muted); }
+.restore p { margin: 0 0 10px; color: var(--muted); }
 .rescue ol { padding-left: 18px; }
 .rescue li { margin: 8px 0; }
 footer { color: var(--muted); font-size: 13px; margin-top: 18px; }

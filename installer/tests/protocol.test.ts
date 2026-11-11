@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -88,7 +88,23 @@ describe("pages base path", () => {
   it("keeps catalogue and package URLs under the project site", () => {
     expect(sitePath("/xianqiang-fm1/", "catalogue.json")).toBe("/xianqiang-fm1/catalogue.json");
     expect(sitePath("/xianqiang-fm1/", "pkg/xianqiang-0.1.fwsc")).toBe("/xianqiang-fm1/pkg/xianqiang-0.1.fwsc");
-    expect(sitePath("./", "pkg/dinghy.fwsc")).toBe("./pkg/dinghy.fwsc");
+    expect(sitePath("./", "pkg/FM-1_015.fwsc")).toBe("./pkg/FM-1_015.fwsc");
+  });
+});
+
+describe("catalogue", () => {
+  it("offers only XianQiang, with official V15 kept for restore", () => {
+    const doc = JSON.parse(readFileSync(new URL("../public/catalogue.json", import.meta.url), "utf8"));
+    expect(doc.firmwares.map((e: { id: string }) => e.id)).toEqual(["xianqiang"]);
+    expect(doc.firmwares[0].file).toBe("pkg/xianqiang-0.1.fwsc");
+    expect(doc.firmwares[0].flash).toBe("new");
+    expect(doc.official.id).toBe("v15");
+    expect(doc.official.file).toBe("pkg/FM-1_015.fwsc");
+    expect(doc.official.flash).toBe("old");
+    expect(doc.official.sha256).toBe(V15_SHA256);
+    expect(doc.links).toBeUndefined();
+    const names = readdirSync(new URL("../public/pkg/", import.meta.url)).sort();
+    expect(names).toEqual(["FM-1_015.fwsc", "xianqiang-0.1.fwsc"]);
   });
 });
 

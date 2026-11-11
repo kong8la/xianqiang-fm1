@@ -52,6 +52,11 @@ jobs:
           from pathlib import Path
           doc = json.loads(Path("installer/dist/catalogue.json").read_text())
           entries = doc["firmwares"] + [doc["official"]]
+          ids = [e["id"] for e in entries]
+          if ids != ["xianqiang", "v15"]:
+              raise SystemExit(f"catalogue ids {ids} != ['xianqiang', 'v15']")
+          if doc.get("links"):
+              raise SystemExit("catalogue still has link cards")
           for e in entries:
               blob = Path("installer/dist") / e["file"]
               digest = hashlib.sha256(blob.read_bytes()).hexdigest()
@@ -59,6 +64,10 @@ jobs:
                   raise SystemExit(f"{e['id']} sha {digest} != {e['sha256']}")
               if not e["file"].startswith("pkg/"):
                   raise SystemExit(f"{e['id']} file path {e['file']} is not under pkg/")
+          blobs = sorted(p.name for p in Path("installer/dist/pkg").glob("*.fwsc"))
+          allowed = sorted(Path(e["file"]).name for e in entries)
+          if blobs != allowed:
+              raise SystemExit(f"pkg files {blobs} != {allowed}")
           print(f"sha256 ok for {len(entries)} packages")
           PY
 

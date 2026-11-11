@@ -310,7 +310,7 @@ export async function preparePackage(raw: Uint8Array, expectedSha?: string): Pro
   if (damage) throw new PackageError(`安装包损坏（${damage}）。请重新下载。没有写入。`);
   const hasLoader = hasLoaderMark(raw);
   if (!hasLoader && sha256 !== V15_SHA256) {
-    throw new PackageError("包里没有 Felucca 更新加载器。官方 V15 以外的这种文件会被拒绝，以免写入引导区。");
+    throw new PackageError("包里没有更新加载器标记。官方 V15 以外的这种文件会被拒绝，以免写入引导区。");
   }
   return { image, product, sha256, hasLoader };
 }

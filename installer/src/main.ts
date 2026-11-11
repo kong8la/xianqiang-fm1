@@ -5,7 +5,7 @@ import { findFm1 } from "./webmidi";
 
 interface Entry {
   id: string;
-  kind: "install" | "official" | "link";
+  kind: "install" | "official";
   featured?: boolean;
   name: string;
   author: string;
@@ -17,7 +17,6 @@ interface Entry {
   sha256?: string;
   size?: number;
   file?: string;
-  href?: string;
   product?: string | null;
 }
 
@@ -26,7 +25,6 @@ interface Catalogue {
   attribution: string;
   firmwares: Entry[];
   official: Entry;
-  links: Entry[];
 }
 
 type Conn =
@@ -37,8 +35,6 @@ type Conn =
 const state: {
   cat: Catalogue | null;
   error: string;
-  q: string;
-  filter: "all" | "new" | "links";
   chip: ChipChoice;
   conn: Conn;
   busy: boolean;
@@ -47,8 +43,6 @@ const state: {
 } = {
   cat: null,
   error: "",
-  q: "",
-  filter: "all",
   chip: (localStorage.getItem("xq-chip") as ChipChoice) || "unknown",
   conn: { mode: "none" },
   busy: false,
@@ -63,10 +57,6 @@ app.addEventListener("click", (ev) => {
   const act = t.dataset.act;
   if (act === "connect") void connectLive();
   if (act === "mock") void connectMock();
-  if (act === "filter") {
-    state.filter = t.dataset.filter as typeof state.filter;
-    render();
-  }
   if (act === "install") void beginInstall(t.dataset.id || "");
   if (act === "v15") void beginInstall("v15");
   if (act === "close") {
@@ -80,17 +70,6 @@ app.addEventListener("click", (ev) => {
       state.warn = null;
       void runInstall(entry, true);
     }
-  }
-});
-app.addEventListener("input", (ev) => {
-  const t = ev.target as HTMLInputElement;
-  if (t.id === "q") {
-    state.q = t.value;
-    render();
-    const box = document.querySelector<HTMLInputElement>("#q");
-    box?.focus();
-    const pos = state.q.length;
-    box?.setSelectionRange(pos, pos);
   }
 });
 app.addEventListener("change", (ev) => {
@@ -120,22 +99,19 @@ function identityText(): string {
   return `${id.text} · ${where} · ${how}`;
 }
 
-function visible(): Entry[] {
-  const cat = state.cat;
-  if (!cat) return [];
-  const q = state.q.trim().toLowerCase();
-  const all = [...cat.firmwares];
-  return all.filter((e) => {
-    if (state.filter === "new" && e.flash === "old") return false;
-    if (state.filter === "links") return false;
-    if (!q) return true;
-    return `${e.name} ${e.author} ${e.summary} ${e.license}`.toLowerCase().includes(q);
-  });
+function firmwares(): Entry[] {
+  return state.cat?.firmwares ?? [];
+}
+
+function restoreLabel(): string {
+  const official = state.cat?.official;
+  if (!official) return "恢复官方 V15";
+  return flashDecision(official.flash || "old", state.chip) === "refuse" ? "新闪存不可装" : "恢复官方 V15";
 }
 
 function render() {
   const cat = state.cat;
-  const cards = visible()
+  const cards = firmwares()
     .map((e) => {
       const decision = e.flash ? flashDecision(e.flash, state.chip) : "ok";
       const blocked = decision === "refuse";
@@ -151,18 +127,6 @@ function render() {
       </article>`;
     })
     .join("");
-  const links = (cat?.links || [])
-    .filter((e) => state.filter !== "new")
-    .filter((e) => !state.q || `${e.name} ${e.summary}`.toLowerCase().includes(state.q.trim().toLowerCase()))
-    .map(
-      (e) => `<article class="card">
-        <h2>${esc(e.name)}</h2>
-        <p class="who">${esc(e.author)} · ${esc(e.license)}</p>
-        <p>${esc(e.summary)}</p>
-        <div class="row"><span class="tag">只提供链接</span><a href="${esc(e.href || e.source || "#")}" target="_blank" rel="noreferrer">前往安装</a></div>
-      </article>`,
-    )
-    .join("");
 
   app.innerHTML = `
   <div class="wrap">
@@ -170,12 +134,11 @@ function render() {
       <div>
         <p class="mark">FM-1 · Web MIDI</p>
         <h1>弦腔安装器</h1>
-        <p class="lede">在 Chrome 或 Edge 里给 FM-1 换开源固件。机器发读取请求，这个页面只回答核对过的字节，不直接写引导区。</p>
+        <p class="lede">在 Chrome 或 Edge 里给 FM-1 安装弦腔。机器发读取请求，这个页面只回答核对过的字节，不直接写引导区。</p>
       </div>
       <div class="actions">
         <button data-act="connect">连接 FM-1</button>
         <button class="ghost" data-act="mock">演示 0xB36014</button>
-        <button class="ghost" data-act="v15" ${state.busy ? "disabled" : ""}>回到官方 V15</button>
       </div>
     </header>
     <section class="device">
@@ -200,19 +163,16 @@ function render() {
       电脑上出现名为 WL82 UBOOT1.00 的磁盘时不要格式化。
     </section>
     ${state.error ? `<p class="err">${esc(state.error)}</p>` : ""}
-    <div class="toolbar">
-      <input id="q" placeholder="搜索名称、作者、说明" value="${esc(state.q)}" />
-      <div class="filters">
-        <button class="ghost" data-act="filter" data-filter="all" aria-pressed="${state.filter === "all"}">全部</button>
-        <button class="ghost" data-act="filter" data-filter="new" aria-pressed="${state.filter === "new"}">支持新闪存</button>
-        <button class="ghost" data-act="filter" data-filter="links" aria-pressed="${state.filter === "links"}">仅外部链接</button>
-      </div>
-    </div>
-    ${cat ? `<div class="grid">${state.filter === "links" ? "" : cards}${links}</div>` : `<p>正在读取目录…</p>`}
+    ${cat ? `<div class="grid">${cards}</div>` : `<p>正在读取目录…</p>`}
     <section class="rescue" id="rescue">
       <h2>救砖</h2>
+      <div class="restore">
+        <h3>恢复官方固件</h3>
+        <p>刷坏之后可以写回 M-VAVE 官方 V15（FM-1_015）。这不是另一台乐器，只用来把机器救回原厂。它只认早期 Puya（0x856014）。选了较新的 UC25HQ80 之后，这里会拒绝写入。</p>
+        <button class="ghost" data-act="v15" ${state.busy ? "disabled" : ""}>${restoreLabel()}</button>
+      </div>
       <ol>
-        <li>固件还能起来时，开机按住 <strong>OCT−</strong>。Dinghy / 弦腔一脉会进入 USB 救援，安装器仍可写。</li>
+        <li>固件还能起来时，开机按住 <strong>OCT−</strong>。弦腔会进入 USB 救援，安装器仍可写。</li>
         <li>屏幕停住、电脑里是 <strong>WL82 UBOOT1.00</strong>：这是芯片 ROM 的下载模式。用 M-Flasher 备份或写回，不要初始化那只磁盘。</li>
         <li>USB 上什么都没有：用 RP2040（Seeed XIAO 或 Pico）做 USB_KEY，只接 D+、D−、GND，不接 VBUS。ROM 认的是字 <strong>0x16EF</strong>。做好的线见 <a href="https://github.com/kurogedelic/FM-1-transporter" target="_blank" rel="noreferrer">FM-1 Transporter</a>。</li>
         <li>写回时只动应用区 <code>0x4000</code>–<code>0x93000</code>。引导区 <code>0x0000</code>–<code>0x3FFF</code> 留给原厂引导。UC25HQ80（<code>0xB36014</code>）不要装 m-bootloader。</li>
@@ -302,7 +262,9 @@ async function beginInstall(id: string) {
   if (decision === "refuse") {
     state.dialog = {
       title: "已拒绝安装",
-      body: `${entry.name} 不能装到闪存 0xB36014 上：它只认早期 Puya，设置会丢，更新也可能被拒绝。请改选带「支持 0xB36014」的固件，例如弦腔、Felucca、Dinghy、OberVave 或 sloopDX。没有写入。`,
+      body: entry.id === "v15"
+        ? "官方 V15 不能装到闪存 0xB36014 上：它只认早期 Puya。这颗闪存请安装弦腔。没有写入。"
+        : `${entry.name} 不能装到闪存 0xB36014 上：它只认早期 Puya，设置会丢，更新也可能被拒绝。没有写入。`,
       percent: 0,
       error: "refused",
     };

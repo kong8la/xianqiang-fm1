@@ -158,18 +158,20 @@ FM-1 是单份固件，没有 A/B 区。先做完整备份。
 
 ## 刷写
 
-浏览器要用 Chrome 或 Edge（Web MIDI，而且要允许 SysEx）。命令行：
+浏览器安装器（Chrome 或 Edge，要允许 SysEx）：[https://kong8la.github.io/xianqiang-fm1/](https://kong8la.github.io/xianqiang-fm1/)。页面只安装弦腔。官方 V15 放在救砖一节，用来把刷坏的机器写回原厂，不是另一项固件。选了较新的 UC25HQ80（`0xB36014`）时，V15 会被拒绝。
+
+命令行：
 
 ```sh
 python3 tools/fm1_install.py dist/xianqiang-0.1.fwsc
 python3 tools/fm1_install.py --info
 ```
 
-安装器会先问再写，写的是应用区和它自带的更新加载器，不写 `0x0000`–`0x3FFF` 的引导区。写到一半断电有风险，见下面的恢复。装上去之后可以用同一个安装器或 Firmware Hub 换回别的包。
+安装器会先问再写，写的是弦腔的应用区和它自带的更新加载器，不写 `0x0000`–`0x3FFF` 的引导区。写到一半断电有风险，见下面的恢复。网页不提供其他固件。
 
 包身份是 `FM-1_94N`（0.1 版为 `FM-1_941`）。`900` SLOOP、`91N` Felucca、`93N` sloopDX、`97N` zp12、`98N` 一个 Doom 移植、`99N` Dinghy 已经占用。公开挂到 Firmware Hub 之前，先对一下当时的列表，避免两份固件用同一个身份。
 
-若机器上跑的是 M-VAVE 的 FM1 Open，不少安装器会拒绝。先按下一节回到官方 V15，再装弦腔。
+若机器上跑的是 M-VAVE 的 FM1 Open，不少安装器会拒绝。先用页面救砖一节的「恢复官方 V15」，或按下一节用 M-Flasher 回到官方 V15，再装弦腔。
 
 ## 回到官方 V15 / V16
 

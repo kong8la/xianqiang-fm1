@@ -15,6 +15,11 @@ const errors = [];
 page.on("pageerror", (err) => errors.push(String(err)));
 await page.goto(base, { waitUntil: "networkidle" });
 await page.waitForSelector("text=弦腔 XianQiang");
+await page.waitForSelector("text=恢复官方 V15");
+const opening = await page.locator("body").innerText();
+for (const banned of ["Felucca", "Dinghy", "Baud Girl", "Groove OS", "FM1 Open", "OberVave", "仅外部链接"]) {
+  if (opening.includes(banned)) throw new Error(`page still shows ${banned}`);
+}
 await page.screenshot({ path: `${out}/installer-catalogue.png`, fullPage: true });
 
 await page.getByRole("button", { name: "演示 0xB36014" }).click();
