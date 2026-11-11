@@ -1,8 +1,8 @@
-# 弦腔 XianQiang
+# 道哥合成器
 
 M-VAVE FM-1 的物理建模固件。六复音，44.1 kHz，定点运算。屏幕上直接显示模型和旋钮名。
 
-![弦腔面板：尼龙拨弦，G4，六个参数条](docs/screen.png)
+![道哥合成器面板：尼龙拨弦，G4，六个参数条](docs/screen.png)
 
 拨弦、木棒、钟、鼓膜、拉弦和吹管做在同一套引擎里，用预设切换。没有接上真机：声音用电脑上的同一套 DSP 渲染成 WAV，并用固件自带的主机模拟器把面板跑了一遍。可刷写的包在 `dist/xianqiang-0.1.fwsc`。
 
@@ -149,7 +149,7 @@ JieLi 的 clang 是 Linux x86-64。`pkgman.jieliapp.com` 在有的网络上会�
 FM-1 是单份固件，没有 A/B 区。先做完整备份。
 
 1. 安装 [M-Flasher](https://github.com/jvitkauskas/m-flasher)（Windows、macOS、Linux）。用数据线直连，不要经过无电源的集线器。
-2. 机器开着、固件还在跑时，点 **DOWNLOAD MODE**。它通过 USB-MIDI 发送 `F0 22 24 35 7D F7`，官方固件和 Felucca 会进下载模式。弦腔走 Dinghy 的更新协议，Firmware Hub 和下面的命令行安装器可以再刷；若这台机器不吃这条 SysEx，用后面的 USB_KEY。
+2. 机器开着、固件还在跑时，点 **DOWNLOAD MODE**。它通过 USB-MIDI 发送 `F0 22 24 35 7D F7`，官方固件和 Felucca 会进下载模式。道哥合成器走 Dinghy 的更新协议，Firmware Hub 和下面的命令行安装器可以再刷；若这台机器不吃这条 SysEx，用后面的 USB_KEY。
 3. 屏幕会停在进入前的画面。电脑上出现名为 `WL82 UBOOT1.00` 的空磁盘。不要初始化、不要格式化。
 4. 在 M-Flasher 里选 **备份整片闪存**。得到 1 MiB 的 `.bin` 和一份 `.json`。两边都留着，最好复制到另一块磁盘。这一步不改闪存。
 5. 备份结束之后再拔线，关机再开机，确认原来的固件还在，然后再装新固件。
@@ -158,7 +158,7 @@ FM-1 是单份固件，没有 A/B 区。先做完整备份。
 
 ## 刷写
 
-浏览器安装器（Chrome 或 Edge，要允许 SysEx）：[https://kong8la.github.io/xianqiang-fm1/](https://kong8la.github.io/xianqiang-fm1/)。页面只安装弦腔。官方 V15 放在救砖一节，用来把刷坏的机器写回原厂，不是另一项固件。选了较新的 UC25HQ80（`0xB36014`）时，V15 会被拒绝。
+浏览器安装器（Chrome 或 Edge，要允许 SysEx）：[https://kong8la.github.io/xianqiang-fm1/](https://kong8la.github.io/xianqiang-fm1/)。页面只安装道哥合成器。官方 V15 放在救砖一节，用来把刷坏的机器写回原厂，不是另一项固件。选了较新的 UC25HQ80（`0xB36014`）时，V15 会被拒绝。
 
 命令行：
 
@@ -167,11 +167,11 @@ python3 tools/fm1_install.py dist/xianqiang-0.1.fwsc
 python3 tools/fm1_install.py --info
 ```
 
-安装器会先问再写，写的是弦腔的应用区和它自带的更新加载器，不写 `0x0000`–`0x3FFF` 的引导区。写到一半断电有风险，见下面的恢复。网页不提供其他固件。
+安装器会先问再写，写的是道哥合成器的应用区和它自带的更新加载器，不写 `0x0000`–`0x3FFF` 的引导区。写到一半断电有风险，见下面的恢复。网页不提供其他固件。
 
 包身份是 `FM-1_94N`（0.1 版为 `FM-1_941`）。`900` SLOOP、`91N` Felucca、`93N` sloopDX、`97N` zp12、`98N` 一个 Doom 移植、`99N` Dinghy 已经占用。公开挂到 Firmware Hub 之前，先对一下当时的列表，避免两份固件用同一个身份。
 
-若机器上跑的是 M-VAVE 的 FM1 Open，不少安装器会拒绝。先用页面救砖一节的「恢复官方 V15」，或按下一节用 M-Flasher 回到官方 V15，再装弦腔。
+若机器上跑的是 M-VAVE 的 FM1 Open，不少安装器会拒绝。先用页面救砖一节的「恢复官方 V15」，或按下一节用 M-Flasher 回到官方 V15，再装道哥合成器。
 
 ## 回到官方 V15 / V16
 
@@ -182,7 +182,7 @@ python3 tools/fm1_install.py --info
 
 用 M-Flasher 的「安装固件」选官方 `.fwsc`。需要连引导区一起回到出厂状态时，用它的「放回原厂引导」，并且只用官方包里的引导，不要用别的工程编的引导。装完关机再开机。
 
-弦腔还在跑、USB 还在时，也可以直接 `python3 tools/fm1_install.py` 指向官方包，只要那个包带社区安装器认识的加载器标记。不认识就改用 M-Flasher。
+道哥合成器还在跑、USB 还在时，也可以直接 `python3 tools/fm1_install.py` 指向官方包，只要那个包带社区安装器认识的加载器标记。不认识就改用 M-Flasher。
 
 ## 闪存型号
 
@@ -193,7 +193,7 @@ python3 tools/fm1_install.py --info
 | 早期 Puya P25Q80H | `0x856014` |
 | 较新的 UC25HQ80 | `0xB36014` |
 
-只认旧 ID 的固件能出声，但设置只留在 RAM 里，关机就没了，而且常常不能再次更新。弦腔沿用 Dinghy 0.5 的 `FL_JEDEC_OK`，两颗都允许保存和再次更新。
+只认旧 ID 的固件能出声，但设置只留在 RAM 里，关机就没了，而且常常不能再次更新。道哥合成器沿用 Dinghy 0.5 的 `FL_JEDEC_OK`，两颗都允许保存和再次更新。
 
 不要在 UC25HQ80 上安装 m-bootloader。M-Flasher 的说明里写过：这颗颗粒还没测过，已有一台装完无法启动，原因不明。保存设置和以后换固件，用认这两颗 ID 的应用固件即可，引导区保持原样。
 
@@ -219,6 +219,6 @@ python3 tools/fm1_install.py --info
 - `./build.sh --release 0.1` 和 `BOARD=smk37 ./build.sh` 链接成功，构建脚本自己的检查通过。反汇编里没有 `__udivdi3` 和软浮点符号。
 - 主机模拟器画出了上面的面板，并写出了带 MIDI 输出的 WAV。
 
-没有 FM-1 在手上，所以下面这些没有在硬件上做过：实际刷写、耳机输出、USB 音频是否无爆音、pi32v2 上这一块的周期数、UC25HQ80 的实机保存、BLE（本固件本来就没有 BLE）。Dinghy 0.5 的平台作者记录过 USB 音频、按键、屏幕和从 Hub 刷回；弦腔的应用层没有在机器上跑过。若声音断裂，先把 `dsp/pm.h` 里的 `PM_VOICES` 从 6 降到 4 再编，模态那一路最吃周期。
+没有 FM-1 在手上，所以下面这些没有在硬件上做过：实际刷写、耳机输出、USB 音频是否无爆音、pi32v2 上这一块的周期数、UC25HQ80 的实机保存、BLE（本固件本来就没有 BLE）。Dinghy 0.5 的平台作者记录过 USB 音频、按键、屏幕和从 Hub 刷回；道哥合成器的应用层没有在机器上跑过。若声音断裂，先把 `dsp/pm.h` 里的 `PM_VOICES` 从 6 降到 4 再编，模态那一路最吃周期。
 
 拉弦是「每圈一个脉冲的波导」，用来把音高锁在延时线上，不是完整的粘-滑弓模型。单簧管是簧片饱和加半周期延时。两者在测试里音高和持续是对的，音色比一架研究用的物理模型简单。

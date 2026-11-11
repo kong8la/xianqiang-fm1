@@ -14,7 +14,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const errors = [];
 page.on("pageerror", (err) => errors.push(String(err)));
 await page.goto(base, { waitUntil: "networkidle" });
-await page.waitForSelector("text=弦腔 XianQiang");
+await page.waitForSelector("text=道哥合成器");
 await page.waitForSelector("text=恢复官方 V15");
 const opening = await page.locator("body").innerText();
 for (const banned of ["Felucca", "Dinghy", "Baud Girl", "Groove OS", "FM1 Open", "OberVave", "仅外部链接"]) {
@@ -43,7 +43,7 @@ await page.screenshot({ path: `${out}/installer-rescue.png` });
 
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
 await phone.goto(base, { waitUntil: "networkidle" });
-await phone.waitForSelector("text=弦腔 XianQiang");
+await phone.waitForSelector("text=道哥合成器");
 await phone.screenshot({ path: `${out}/installer-mobile.png`, fullPage: true });
 
 if (errors.length) {

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* 弦腔 / XianQiang — physical-modeling firmware for the M-VAVE FM-1.
+/* 道哥合成器 / DaoGe Synth — physical-modeling firmware for the M-VAVE FM-1.
  *
  * The panel, USB, MIDI, screen and update path are Dinghy (GPL-3.0-only),
  * itself the Felucca / SLOOP platform. Upstream Dinghy commit ea1b6bf.
@@ -8,6 +8,7 @@
  *
  * Integers only. app_audio() only calls pm_render(). The screen and the
  * encoders run in the main loop. */
+#include "daoge_title.h"
 #define APP_NAME "XIANQ"
 #define STORE_MAGIC 0x474E5158u             /* "XQNG" — not Dinghy's DNGY */
 #define CV_MAX (240u * 96u)
@@ -218,6 +219,21 @@ static void app_idle(void)
         midi_in();
 }
 
+/* The panel font is Latin, so the splash is a 1-bit 道哥合成器. */
+static void draw_title(void)
+{
+    uint32_t y, x;
+    cv_begin(DAOGE_TITLE_W, DAOGE_TITLE_H, C_BLACK);
+    for (y = 0; y < DAOGE_TITLE_H; y++) {
+        for (x = 0; x < DAOGE_TITLE_W; x++) {
+            if (DAOGE_TITLE[y][x >> 3] & (uint8_t)(0x80u >> (x & 7u)))
+                cv_pset((int32_t)x, (int32_t)y, C_ACC);
+        }
+    }
+    cv_blit(0, 4);
+    lcd_sync();
+}
+
 static void app_main(void)
 {
     uint32_t prev = 0, k, t_change = 0, dirty = 0;
@@ -242,7 +258,7 @@ static void app_main(void)
 
     uint32_t preset_drawn = ~0u;
     lcd_fill(0, 0, 240, 240, C_BLACK);
-    draw_text_box(0, 4, 240, &FONT_L, "XIANQIANG", C_ACC, 1);
+    draw_title();
 
     for (;;) {
         uint32_t keys, down, up, rel, b, lit = 0, out_ch, st, parm;

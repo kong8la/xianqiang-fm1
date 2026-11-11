@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build installer/public/catalogue.json for 弦腔 and the official V15 rescue package.
+"""Build installer/public/catalogue.json for 道哥合成器 and the official V15 rescue package.
 
 The page offers only this repository's firmware. Official M-VAVE V15
 (FM-1_015 from m-vave/fm1_open @ b178ac4) stays so a bad flash can be written
@@ -64,14 +64,14 @@ def main() -> None:
     v15_sha = sha256(v15)
     doc = {
         "generatedBy": "installer/scripts/fetch-catalogue.py",
-        "flashNote": "弦腔认早期 Puya（0x856014）和较新的 UC25HQ80（0xB36014）。官方 V15 只用来在救砖时写回原厂，只认早期 Puya。",
+        "flashNote": "道哥合成器认早期 Puya（0x856014）和较新的 UC25HQ80（0xB36014）。官方 V15 只用来在救砖时写回原厂，只认早期 Puya。",
         "attribution": "官方 V15 来自 m-vave/fm1_open 提交 b178ac4 的 sdk/firmware/FM-1_015.fwsc。",
         "firmwares": [
             {
                 "id": "xianqiang",
                 "kind": "install",
                 "featured": True,
-                "name": "弦腔 XianQiang",
+                "name": "道哥合成器 0.1",
                 "author": "本仓库",
                 "summary": "六复音物理建模：拨弦、木棒、钟、鼓膜、拉弦和单簧管/长笛。认 Puya 与 UC25HQ80。",
                 "license": "GPL-3.0-only",

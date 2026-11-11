@@ -1,6 +1,6 @@
 # Licensing
 
-XianQiang is built on Dinghy, which is free software under the GNU General Public License, version 3 only
+DaoGe Synth (道哥合成器) is built on Dinghy, which is free software under the GNU General Public License, version 3 only
 (`GPL-3.0-only`, full text in `LICENSE`). You may use, study, change and share it. If you give someone a firmware
 built from it, give them its complete source under the same licence too. The physical-modeling core in `dsp/`
 and the desktop host in `host/` are MIT; linking them into this firmware makes the firmware GPL-3.0-only as a whole.

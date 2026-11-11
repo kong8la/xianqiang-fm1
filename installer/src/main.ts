@@ -133,8 +133,8 @@ function render() {
     <header class="top">
       <div>
         <p class="mark">FM-1 · Web MIDI</p>
-        <h1>弦腔安装器</h1>
-        <p class="lede">在 Chrome 或 Edge 里给 FM-1 安装弦腔。机器发读取请求，这个页面只回答核对过的字节，不直接写引导区。</p>
+        <h1>道哥合成器安装器</h1>
+        <p class="lede">在 Chrome 或 Edge 里给 FM-1 安装道哥合成器。机器发读取请求，这个页面只回答核对过的字节，不直接写引导区。</p>
       </div>
       <div class="actions">
         <button data-act="connect">连接 FM-1</button>
@@ -172,7 +172,7 @@ function render() {
         <button class="ghost" data-act="v15" ${state.busy ? "disabled" : ""}>${restoreLabel()}</button>
       </div>
       <ol>
-        <li>固件还能起来时，开机按住 <strong>OCT−</strong>。弦腔会进入 USB 救援，安装器仍可写。</li>
+        <li>固件还能起来时，开机按住 <strong>OCT−</strong>。道哥合成器会进入 USB 救援，安装器仍可写。</li>
         <li>屏幕停住、电脑里是 <strong>WL82 UBOOT1.00</strong>：这是芯片 ROM 的下载模式。用 M-Flasher 备份或写回，不要初始化那只磁盘。</li>
         <li>USB 上什么都没有：用 RP2040（Seeed XIAO 或 Pico）做 USB_KEY，只接 D+、D−、GND，不接 VBUS。ROM 认的是字 <strong>0x16EF</strong>。做好的线见 <a href="https://github.com/kurogedelic/FM-1-transporter" target="_blank" rel="noreferrer">FM-1 Transporter</a>。</li>
         <li>写回时只动应用区 <code>0x4000</code>–<code>0x93000</code>。引导区 <code>0x0000</code>–<code>0x3FFF</code> 留给原厂引导。UC25HQ80（<code>0xB36014</code>）不要装 m-bootloader。</li>
@@ -263,7 +263,7 @@ async function beginInstall(id: string) {
     state.dialog = {
       title: "已拒绝安装",
       body: entry.id === "v15"
-        ? "官方 V15 不能装到闪存 0xB36014 上：它只认早期 Puya。这颗闪存请安装弦腔。没有写入。"
+        ? "官方 V15 不能装到闪存 0xB36014 上：它只认早期 Puya。这颗闪存请安装道哥合成器。没有写入。"
         : `${entry.name} 不能装到闪存 0xB36014 上：它只认早期 Puya，设置会丢，更新也可能被拒绝。没有写入。`,
       percent: 0,
       error: "refused",

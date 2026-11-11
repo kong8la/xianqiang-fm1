@@ -1,10 +1,10 @@
-# 弦腔安装器
+# 道哥合成器安装器
 
 线上地址：[https://kong8la.github.io/xianqiang-fm1/](https://kong8la.github.io/xianqiang-fm1/)
 
-在 Chrome 或 Edge 里给 M-VAVE FM-1 安装弦腔的静态网页。走的是和 M-VAVE 更新器相同的 USB-MIDI SysEx：正在运行的固件先把包里的更新加载器读走并启动，加载器再把整包写进应用区。这个页面只回答设备的读取请求，不直接写闪存地址。源码仓库：[kong8la/xianqiang-fm1](https://github.com/kong8la/xianqiang-fm1)。
+在 Chrome 或 Edge 里给 M-VAVE FM-1 安装道哥合成器的静态网页。走的是和 M-VAVE 更新器相同的 USB-MIDI SysEx：正在运行的固件先把包里的更新加载器读走并启动，加载器再把整包写进应用区。这个页面只回答设备的读取请求，不直接写闪存地址。源码仓库：[kong8la/xianqiang-fm1](https://github.com/kong8la/xianqiang-fm1)。
 
-页面只提供弦腔。官方 V15（`FM-1_015`）留在救砖一节，用来把刷坏的机器写回原厂，不是另一项固件选择。
+页面只提供道哥合成器。官方 V15（`FM-1_015`）留在救砖一节，用来把刷坏的机器写回原厂，不是另一项固件选择。
 
 ## 本地看
 
@@ -18,7 +18,7 @@ npm run dev                          # http://127.0.0.1:43127
 
 没有真机时，页面上的「演示 0xB36014」会接一台模拟 FM-1：它按同一套协议握手、读包、进入加载器、写完再报新身份。模拟机不会碰硬件。
 
-`npm test` 用 Vitest 核对 7 比特打包、请求校验、和仓库里 Python 安装器对同一段字节的结果、弦腔 0.1 包的身份 `FM-1_941`，以及一次从「正在运行」到「写完重启」的模拟安装。读到超出包长度的地址会直接拒绝，不发送数据。
+`npm test` 用 Vitest 核对 7 比特打包、请求校验、和仓库里 Python 安装器对同一段字节的结果、道哥合成器 0.1 包的身份 `FM-1_941`，以及一次从「正在运行」到「写完重启」的模拟安装。读到超出包长度的地址会直接拒绝，不发送数据。
 
 ## 部署
 
@@ -38,21 +38,21 @@ npm run build                       # 本地或网站根目录，base 为 ./
 - **Vercel / Netlify / Cloudflare Pages**：根目录设为 `installer`，构建命令 `npm run build`，输出目录 `dist`。若站点不在域名根路径，把构建环境变量 `GITHUB_PAGES` 设成 `true`，或改 `vite.config.ts` 里的 `base`。
 - **自己的 nginx**：`root` 指到 `dist`。`.fwsc` 用默认二进制类型即可。
 
-GitHub Release 的下载地址会 302 到 `release-assets.githubusercontent.com`，响应里没有 `Access-Control-Allow-Origin`，浏览器里的页面不能直接去拉。所以弦腔包放在 `public/pkg/xianqiang-0.1.fwsc`，由 `scripts/fetch-catalogue.py` 从 `dist/xianqiang-0.1.fwsc` 复制并计算 SHA-256。官方 V15 来自 `m-vave/fm1_open` 提交 `b178ac4` 的 `sdk/firmware/FM-1_015.fwsc`，哈希必须是 `db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`，文件是 `public/pkg/FM-1_015.fwsc`。目录里不再镜像其他固件。
+GitHub Release 的下载地址会 302 到 `release-assets.githubusercontent.com`，响应里没有 `Access-Control-Allow-Origin`，浏览器里的页面不能直接去拉。所以道哥合成器包放在 `public/pkg/xianqiang-0.1.fwsc`，由 `scripts/fetch-catalogue.py` 从 `dist/xianqiang-0.1.fwsc` 复制并计算 SHA-256。官方 V15 来自 `m-vave/fm1_open` 提交 `b178ac4` 的 `sdk/firmware/FM-1_015.fwsc`，哈希必须是 `db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a`，文件是 `public/pkg/FM-1_015.fwsc`。目录里不再镜像其他固件。
 
-弦腔包必须带更新加载器标记（`FELUCCA-LOADER-1`）。这个标记用来确认加载器不会改 `0x0000`–`0x3FFF` 的引导区。官方 V15 是例外：它用自己的加载器，只接受上面这一个哈希。
+道哥合成器包必须带更新加载器标记（`FELUCCA-LOADER-1`）。这个标记用来确认加载器不会改 `0x0000`–`0x3FFF` 的引导区。官方 V15 是例外：它用自己的加载器，只接受上面这一个哈希。
 
 ## 目录里有什么
 
-`public/catalogue.json` 的 `firmwares` 只有弦腔：中文说明、许可证、版本、源码链接、SHA-256，以及它认较新的 UC25HQ80（`0xB36014`）。`official` 是救砖用的官方 V15，闪存分类为 `old`（只认早期 Puya）。没有外链卡片。
+`public/catalogue.json` 的 `firmwares` 只有道哥合成器：中文说明、许可证、版本、源码链接、SHA-256，以及它认较新的 UC25HQ80（`0xB36014`）。`official` 是救砖用的官方 V15，闪存分类为 `old`（只认早期 Puya）。没有外链卡片。
 
 ## 安全
 
 - 写入前核对 SHA-256，并解析包身份。身份不是 `FM-1_…` 的包会拒绝。
 - 文件头、文件表和 `flash.bin` / `ota.bin` 的 CRC 不对就拒绝。
 - 设备如果请求包以外的地址，页面不回答。
-- 握手只报告固件身份（例如 `FM-1_941`），不报告闪存 JEDEC。页面请你自己选 `0x856014` 或 `0xB36014`。选了新闪存之后，官方 V15 会打开拒绝说明，不会发更新命令。还没选时，恢复官方 V15 会先弹出警告，要你确认这台不是 `0xB36014`。弦腔认这两颗闪存，不会被这条规则拦住。
-- 更新协议本身不让这个网页指定「把引导区写成某某字节」。弦腔包还要求带更新加载器标记；官方 V15 只接受固定哈希。
+- 握手只报告固件身份（例如 `FM-1_941`），不报告闪存 JEDEC。页面请你自己选 `0x856014` 或 `0xB36014`。选了新闪存之后，官方 V15 会打开拒绝说明，不会发更新命令。还没选时，恢复官方 V15 会先弹出警告，要你确认这台不是 `0xB36014`。道哥合成器认这两颗闪存，不会被这条规则拦住。
+- 更新协议本身不让这个网页指定「把引导区写成某某字节」。道哥合成器包还要求带更新加载器标记；官方 V15 只接受固定哈希。
 
 刷写前用 [M-Flasher](https://github.com/jvitkauskas/m-flasher) 或 [MvaveFM1Unbricker](https://github.com/Quixotic7/MvaveFM1Unbricker) 备份整片 1 MiB。下载模式里出现的 `WL82 UBOOT1.00` 磁盘不要格式化。救砖步骤在页面底部：开机按住 OCT−、ROM 下载模式、RP2040 USB_KEY（`0x16EF`，见 [FM-1 Transporter](https://github.com/kurogedelic/FM-1-transporter)）。不要在 UC25HQ80 上安装 m-bootloader。
 
