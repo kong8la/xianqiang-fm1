@@ -55,6 +55,7 @@ typedef struct {
     int32_t fade;               /* Q15 output fade-in */
     uint8_t model, note, vel, held, sus, alive, flute, click;
     uint8_t pos, color, excite; /* snapshotted at note-on */
+    uint16_t glide;             /* guzheng pitch slide, samples in Q0 */
 } pm_voice;
 
 static pm_voice voices[PM_VOICES] PM_MEM;
@@ -111,6 +112,11 @@ static const pm_preset_t PRESETS[PM_NPRESET] = {
     {"TEMPLE", "BELL", PM_BELL, 100, 60, 30, 10, 12, 0, 0, 0, 0},
     {"TABLA", "MEMB", PM_MEMB, 18, 110, 55, 40, 120, 0, 0, 0, 0},
     {"SOLO", "BOW", PM_BOW, 108, 115, 28, 120, 100, 0, 0, 0, 0},
+    {"KOTO", "KOTO", PM_KOTO, 110, 100, 30, 90, 24, 0, 0, 0, 0},
+    {"GONG", "PLATE", PM_PLATE, 120, 90, 40, 30, 40, PM_FX_REV, 28, 70, 36},
+    {"ORGAN", "ORGAN", PM_ORGAN, 100, 80, 50, 90, 40, 0, 0, 0, 0},
+    {"BOWED", "BOWBAR", PM_BOWBAR, 110, 70, 40, 60, 50, 0, 0, 0, 0},
+    {"ZHENG", "ZHENG", PM_ZHENG, 100, 90, 36, 70, 80, 0, 0, 0, 0},
 };
 
 static const char *const PNAME_PLUCK[6] = {"DECAY", "TONE", "PICK", "BODY", "NOISE", "LEVEL"};
@@ -122,15 +128,17 @@ static const char *const PNAME_REED[6] = {"DECAY", "TONE", "PLACE", "REED", "BRE
  * two are milder so high notes do not alias into a buzz. Bell partials are
  * the usual 1, 2, 2.4, 3, 4.5 set. Membrane partials follow the first zeros
  * of the circular-membrane Bessel function, normalised to the fundamental. */
-static const uint16_t RATIO[3][PM_MODES] = {
+static const uint16_t RATIO[4][PM_MODES] = {
     {1024, 4045, 9114, 10240, 11264},
     {1024, 2048, 2458, 3072, 4608},
     {1024, 1632, 2186, 2350, 2717},
+    {1024, 1772, 2376, 3082, 3973}, /* plate: 1, 1.73, 2.32, 3.01, 3.88 */
 };
-static const int16_t MGAIN[3][PM_MODES] = {
+static const int16_t MGAIN[4][PM_MODES] = {
     {14000, 7000, 2800, 1200, 500},
     {9000, 8000, 6400, 4200, 2600},
     {12000, 8000, 4200, 2600, 1400},
+    {11000, 8000, 5000, 3000, 1800},
 };
 
 const pm_preset_t *pm_presets(void) { return PRESETS; }
@@ -140,11 +148,11 @@ const char *pm_param_name(uint8_t model, uint8_t param)
     const char *const *row = PNAME_PLUCK;
     if (param >= PM_NPARAM)
         return "";
-    if (model == PM_BOW)
+    if (model == PM_BOW || model == PM_BOWBAR)
         row = PNAME_BOW;
-    else if (model == PM_REED)
+    else if (model == PM_REED || model == PM_ORGAN)
         row = PNAME_REED;
-    else if (model == PM_BAR || model == PM_BELL || model == PM_MEMB)
+    else if (model == PM_BAR || model == PM_BELL || model == PM_MEMB || model == PM_PLATE)
         row = PNAME_MODAL;
     return row[param];
 }
@@ -495,6 +503,8 @@ static void start_modal(pm_voice *v)
         which = 1;
     else if (v->model == PM_MEMB)
         which = 2;
+    else if (v->model == PM_PLATE)
+        which = 3;
     for (m = 0; m < PM_MODES; m++) {
         uint32_t f = ((m + 1u) * p << 16) / 128u;
         int32_t strike = sin_pi(f);
@@ -534,6 +544,10 @@ static int32_t render_pluck(pm_voice *v, uint32_t del_q16, int32_t lg, int32_t b
     v->prev = s;
     mixed = avg + pm_q15(s - avg, bright_q15);
     y = pm_q15(mixed, lg);
+    if (v->model == PM_KOTO) {
+        int32_t buzz = pm_read(v, del_q16 >> 1);
+        y -= buzz >> 3;
+    }
     pm_write(v, y);
     return y;
 }
@@ -568,6 +582,11 @@ static int32_t render_modal(pm_voice *v, uint32_t bend, int released, uint8_t de
         a = v->amp[m] >> 8;
         y += pm_q15(s, a);
         step = base + (base * (int32_t)m) / 2;
+        if (v->model == PM_BOWBAR && !released) {
+            step = 1;
+            if (v->amp[m] < v->gain_m[m] * 200)
+                v->amp[m] += 48;
+        }
         v->amp[m] -= step;
         if (v->amp[m] < 0)
             v->amp[m] = 0;
@@ -658,15 +677,38 @@ static int32_t dc_block(pm_voice *v, int32_t x)
     return x - v->dc;
 }
 
+static uint8_t voice_cap(void)
+{
+    uint8_t n = PM_VOICES;
+    if (g_model == PM_PLATE || g_model == PM_ORGAN || g_model == PM_BOWBAR)
+        n = 4;
+    if (pm_fx_kind() == PM_FX_REV && n > 4u)
+        n = 4;
+    return n;
+}
+
+uint8_t pm_voice_cap(void) { return g_ready ? voice_cap() : PM_VOICES; }
+
+uint32_t pm_ram_bytes(void)
+{
+    return (uint32_t)sizeof(voices) + pm_fx_ram();
+}
+
 static void note_on(uint8_t note, uint8_t vel)
 {
-    uint32_t i, best = 0, score_b = 0xFFFFFFFFu;
+    uint32_t i, best = 0, score_b = 0xFFFFFFFFu, alive = 0;
+    uint8_t cap = voice_cap();
     pm_voice *v;
+    for (i = 0; i < PM_VOICES; i++)
+        if (voices[i].alive)
+            alive++;
     for (i = 0; i < PM_VOICES; i++) {
         uint32_t score;
-        if (!voices[i].alive)
+        if (!voices[i].alive) {
+            if (alive >= cap)
+                continue;
             score = 10u + i;
-        else if (voices[i].note == note && voices[i].held)
+        } else if (voices[i].note == note && voices[i].held)
             score = 0;
         else
             score = 0x80000000u + voices[i].age;
@@ -685,7 +727,10 @@ static void note_on(uint8_t note, uint8_t vel)
     v->pos = g_param[PM_POS];
     v->color = g_param[PM_COLOR];
     v->excite = g_param[PM_EXCITE];
-    v->flute = (uint8_t)(v->model == PM_REED && v->color >= 64);
+    v->flute = (uint8_t)(v->model == PM_ORGAN || (v->model == PM_REED && v->color >= 64));
+    v->glide = 0;
+    if (v->model == PM_ZHENG)
+        v->glide = (uint16_t)(48u + v->excite);
     v->base_del = PM_DEL_Q16[note];
     v->note_inc = PM_INC[note];
     v->age = ++voice_age;
@@ -696,9 +741,9 @@ static void note_on(uint8_t note, uint8_t vel)
     v->bow_ph = 0;
     v->lp = 0;
     v->prev = 0;
-    if (v->model == PM_PLUCK)
+    if (v->model == PM_PLUCK || v->model == PM_KOTO || v->model == PM_ZHENG)
         start_pluck(v, v->base_del);
-    else if (v->model == PM_BAR || v->model == PM_BELL || v->model == PM_MEMB)
+    else if (v->model == PM_BAR || v->model == PM_BELL || v->model == PM_MEMB || v->model == PM_PLATE || v->model == PM_BOWBAR)
         start_modal(v);
     else {
         uint32_t k;
@@ -813,10 +858,16 @@ void pm_render(int32_t *out, uint32_t n)
             released = !(voice->held || voice->sus);
             sounding = voice->held || voice->sus;
             del = pm_delay_of(voice->base_del, inv, voice->model == PM_REED && !voice->flute);
-            if (voice->model == PM_PLUCK) {
+            if (voice->model == PM_ZHENG && voice->glide) {
+                uint32_t bump = (uint32_t)voice->glide << 13;
+                if (del > bump + (8u << 16))
+                    del -= bump;
+                voice->glide = voice->glide > 1u ? (uint16_t)(voice->glide - 1u) : 0;
+            }
+            if (voice->model == PM_PLUCK || voice->model == PM_KOTO || voice->model == PM_ZHENG) {
                 lg = loop_gain(decay, released, 0);
                 y = render_pluck(voice, del, lg, vbright);
-            } else if (voice->model == PM_BOW || voice->model == PM_REED) {
+            } else if (voice->model == PM_BOW || voice->model == PM_REED || voice->model == PM_ORGAN) {
                 int32_t k = 127 - (int32_t)decay;
                 int32_t loss = 3 + k / 4;
                 if (released)
@@ -840,10 +891,12 @@ void pm_render(int32_t *out, uint32_t n)
                     if (voice->breath < breath_to)
                         voice->breath = breath_to;
                 }
-                if (voice->model == PM_BOW || voice->flute)
-                    y = render_sustained(voice, del, lg, vbright, voice->breath, voice->flute);
+                if (voice->model == PM_BOW || voice->flute || voice->model == PM_ORGAN)
+                    y = render_sustained(voice, del, lg, vbright, voice->breath, voice->flute || voice->model == PM_ORGAN);
                 else
                     y = render_wind(voice, del, lg, vbright, voice->breath);
+                if (voice->model == PM_ORGAN)
+                    y += pm_read(voice, del >> 1) >> 2;
             } else {
                 y = render_modal(voice, bend, released, decay, color);
             }

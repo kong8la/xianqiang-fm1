@@ -10,7 +10,7 @@
 #define PM_FS 44100u
 #define PM_VOICES 6u
 #define PM_NPARAM 6u
-#define PM_NPRESET 32u
+#define PM_NPRESET 37u
 
 enum {
     PM_DECAY = 0,
@@ -28,6 +28,11 @@ enum {
     PM_MEMB,
     PM_BOW,
     PM_REED,
+    PM_KOTO,
+    PM_PLATE,
+    PM_ORGAN,
+    PM_BOWBAR,
+    PM_ZHENG,
     PM_NMODEL
 };
 
@@ -66,4 +71,6 @@ void pm_render(int32_t *out, uint32_t n);
 
 int pm_quiet(void);                                 /* 1 = nothing left to hear */
 uint8_t pm_last_note(void);                         /* 255 = none yet */
+uint8_t pm_voice_cap(void);                         /* 4 when the model or reverb is heavy */
+uint32_t pm_ram_bytes(void);
 #endif

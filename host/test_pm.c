@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Host tests for the physical-modeling core. No hardware, no float in the DSP. */
 #include "pm.h"
+#include <time.h>
 #include "pm_fx.h"
 #include "pm_user.h"
 #include "xq_play.h"
@@ -626,7 +627,7 @@ static void test_user_bank(void)
     int src = 9;
     const pm_preset_t *pr = pm_presets();
     pm_init();
-    expect(PM_NPRESET == 32, "32 factory presets");
+    expect(PM_NPRESET == 37, "37 factory presets");
     expect(strcmp(pr[0].name, "NYLON") == 0 && strcmp(pr[1].name, "STEEL") == 0, "first presets stay put");
     expect(strcmp(pr[13].name, "FLUTE") == 0 && strcmp(pr[31].name, "SOLO") == 0, "last old and new presets");
     pm_load_preset(15); /* BANJO */
@@ -731,6 +732,58 @@ static void test_play(void)
     expect(ok, "random arp stays on the held notes");
 }
 
+static void test_models_and_budget(void)
+{
+    uint32_t n = 0, i;
+    int16_t *koto, *nylon, *zheng, *pluck;
+    clock_t t0;
+    double sec;
+    int32_t buf[256 * 2];
+    const uint8_t chord[6] = {60, 64, 67, 72, 76, 79};
+    koto = take(32, 67, 100, 400, 600, &n);
+    nylon = take(0, 67, 100, 400, 600, &n);
+    expect(peak(koto, n) > 400, "koto is audible");
+    expect(hash_pcm(koto, n) != hash_pcm(nylon, n), "koto is not the nylon pluck");
+    free(koto);
+    free(nylon);
+    zheng = take(36, 64, 110, 500, 700, &n);
+    pluck = take(0, 64, 110, 500, 700, &n);
+    expect(peak(zheng, n) > 400, "guzheng is audible");
+    expect(hash_pcm(zheng, n) != hash_pcm(pluck, n), "guzheng bend changes the pluck");
+    free(zheng);
+    free(pluck);
+    {
+        uint32_t ng = 0, no = 0, nb = 0;
+        int16_t *gong = take(33, 60, 100, 400, 700, &ng);
+        int16_t *organ = take(34, 60, 90, 500, 800, &no);
+        int16_t *bowed = take(35, 60, 100, 500, 800, &nb);
+        expect(peak(gong, ng) > 400, "gong is audible");
+        expect(peak(organ, no) > 400, "organ pipe is audible");
+        expect(peak(bowed, nb) > 400, "bowed bar is audible");
+        free(gong);
+        free(organ);
+        free(bowed);
+    }
+    pm_init();
+    pm_load_preset(33);
+    expect(pm_voice_cap() == 4, "gong plus reverb drops to four voices");
+    pm_load_preset(0);
+    expect(pm_voice_cap() == PM_VOICES, "nylon keeps six voices");
+    t0 = clock();
+    pm_init();
+    pm_load_preset(0);
+    for (i = 0; i < 6; i++)
+        pm_note_on(chord[i], 110);
+    for (i = 0; i < PM_FS / 256; i++) {
+        zero(buf, 512);
+        pm_render(buf, 256);
+    }
+    sec = (double)(clock() - t0) / (double)CLOCKS_PER_SEC;
+    fprintf(stderr, "  budget pluck6 %.3fs realtime  ram %u bytes  fx %u\n", sec, pm_ram_bytes(), pm_fx_ram());
+    expect(sec < 0.5, "six plucks render with headroom");
+    expect(pm_ram_bytes() < 80u * 1024u, "voice plus effect RAM stays under 80 KB");
+}
+
 int main(void)
 {
     test_silence();
@@ -747,6 +800,7 @@ int main(void)
     test_user_bank();
     test_play();
     test_midi_depth();
+    test_models_and_budget();
     if (fails) {
         fprintf(stderr, "%d failure(s)\n", fails);
         return 1;
