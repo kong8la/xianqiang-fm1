@@ -60,17 +60,69 @@ static void num3(char *s, unsigned v)
     s[3] = 0;
 }
 
+static uint8_t ui_page, seq_edit;
+static uint32_t catch_until;
+
+/* Encoders are relative. After a page change, drop any steps already queued
+ * and ignore a large burst for a moment so the knob you were holding does not
+ * jump the new parameter. */
+static int32_t take_enc(uint32_t id)
+{
+    int32_t e = fm1_enc_take(id);
+    if (!e)
+        return 0;
+    if ((int32_t)(catch_until - fm1_ms) > 0 && (e > 2 || e < -2))
+        return 0;
+    return e;
+}
+
+static void add8(uint8_t *v, int32_t e, int32_t max)
+{
+    int32_t x = (int32_t)*v + ((e > 1 || e < -1) ? e * 2 : e);
+    if (x < 0)
+        x = 0;
+    if (x > max)
+        x = max;
+    *v = (uint8_t)x;
+}
+
+static xq_play_t play;
+
 static void draw_params(void)
 {
+    static const char *const FXN[6] = {"TYPE", "MIX", "TIME", "FB", "", "LEVEL"};
+    static const char *const ARPN[6] = {"MODE", "RATE", "GATE", "OCT", "LATCH", "LEVEL"};
+    static const char *const SEQN[6] = {"STEP", "NOTE", "VEL", "LEN", "", "LEVEL"};
+    uint8_t knd, mx, tm, fbk;
     uint32_t i;
+    pm_fx_get(&knd, &mx, &tm, &fbk);
     cv_begin(240, 96, C_BLACK);
-    for (i = 0; i < PM_NPARAM; i++) {
+    for (i = 0; i < 6u; i++) {
         char n[4];
-        int32_t y = (int32_t)i * 16;
-        unsigned v = pm_get_param((uint8_t)i);
-        int32_t w = (int32_t)v * 88 / 127;
+        const char *name = "";
+        unsigned v = 0, max = 127;
+        int32_t y = (int32_t)i * 16, w;
+        if (ui_page == 0) {
+            name = pm_param_name(pm_model(), (uint8_t)i);
+            v = pm_get_param((uint8_t)i);
+        } else if (ui_page == 1) {
+            name = FXN[i];
+            v = i == 0 ? knd : i == 1 ? mx : i == 2 ? tm : i == 3 ? fbk : i == 5 ? pm_get_param(PM_LEVEL) : 0;
+            max = i == 0 ? 3 : 127;
+        } else if (ui_page == 2) {
+            name = ARPN[i];
+            v = i == 0 ? play.mode : i == 1 ? play.rate : i == 2 ? play.gate : i == 3 ? play.octaves : i == 4 ? play.latch : pm_get_param(PM_LEVEL);
+            max = i == 0 ? 4 : i == 1 ? 7 : i == 2 ? 8 : i == 3 ? 3 : i == 4 ? 1 : 127;
+        } else {
+            name = SEQN[i];
+            v = i == 0 ? seq_edit : i == 1 ? play.seq_note[seq_edit] : i == 2 ? play.seq_vel[seq_edit] : i == 3 ? play.seq_len : i == 5 ? pm_get_param(PM_LEVEL) : 0;
+            max = i == 0 ? 15 : i == 3 ? 16 : 127;
+        }
+        if (!name[0])
+            continue;
+        w = max ? (int32_t)v * 88 / (int32_t)max : 0;
         num3(n, v);
-        cv_text(4, y, &FONT_S, pm_param_name(pm_model(), (uint8_t)i), C_INK);
+        cv_text(4, y, &FONT_S, name, C_INK);
         cv_rect(84, y + 5, 88, 6, RGB(42, 32, 24));
         if (w > 0)
             cv_rect(84, y + 5, w, 6, C_ACC);
@@ -121,7 +173,6 @@ static void apply_set(void)
 
 static uint32_t idle_ok, midi_src, clk_n, clk_t0, clk_bpm, clk_run, clk_beat_ms;
 static uint8_t midi_sus;
-static xq_play_t play;
 static uint32_t ext_clk_ms, int_clk_ms, int_run;
 static pm_user_bank_t ubank;
 static int ubank_src = -1;
@@ -416,6 +467,13 @@ static void app_main(void)
         }
         if (b & (1u << BTN_HOME))
             pm_panic();
+        if (b & (1u << BTN_EDIT)) {
+            uint32_t ei;
+            ui_page = (uint8_t)((ui_page + 1u) & 3u);
+            for (ei = 0; ei < 7u; ei++)
+                (void)fm1_enc_take(ei);
+            catch_until = fm1_ms + 250u;
+        }
         if (b & (1u << BTN_ARP))
             play.arp_on = (uint8_t)!play.arp_on;
         if (b & (1u << BTN_SEQ))
@@ -479,12 +537,85 @@ static void app_main(void)
             dirty = 1;
             t_change = fm1_ms;
         }
-        if ((e = fm1_enc_take(ENC_SELECT)) != 0) { nudge(PM_DECAY, e); dirty = 1; t_change = fm1_ms; }
-        if ((e = fm1_enc_take(ENC_ALGORITHM)) != 0) { nudge(PM_BRIGHT, e); dirty = 1; t_change = fm1_ms; }
-        if ((e = fm1_enc_take(ENC_KNOB1)) != 0) { nudge(PM_POS, e); dirty = 1; t_change = fm1_ms; }
-        if ((e = fm1_enc_take(ENC_KNOB2)) != 0) { nudge(PM_COLOR, e); dirty = 1; t_change = fm1_ms; }
-        if ((e = fm1_enc_take(ENC_KNOB3)) != 0) { nudge(PM_EXCITE, e); dirty = 1; t_change = fm1_ms; }
-        if ((e = fm1_enc_take(ENC_KNOB4)) != 0) { nudge(PM_LEVEL, e); dirty = 1; t_change = fm1_ms; }
+        if ((e = take_enc(ENC_SELECT)) != 0) {
+            if (ui_page == 0)
+                nudge(PM_DECAY, e);
+            else if (ui_page == 1) {
+                uint8_t k, m, t, f;
+                pm_fx_get(&k, &m, &t, &f);
+                add8(&k, e, 3);
+                pm_fx_set(k, m, t, f);
+            } else if (ui_page == 2)
+                add8(&play.mode, e, 4);
+            else
+                add8(&seq_edit, e, 15);
+            dirty = 1;
+            t_change = fm1_ms;
+        }
+        if ((e = take_enc(ENC_ALGORITHM)) != 0) {
+            if (ui_page == 0)
+                nudge(PM_BRIGHT, e);
+            else if (ui_page == 1) {
+                uint8_t k, m, t, f;
+                pm_fx_get(&k, &m, &t, &f);
+                add8(&m, e, 127);
+                pm_fx_set(k, m, t, f);
+            } else if (ui_page == 2)
+                add8(&play.rate, e, 7);
+            else
+                add8(&play.seq_note[seq_edit], e, 127);
+            dirty = 1;
+            t_change = fm1_ms;
+        }
+        if ((e = take_enc(ENC_KNOB1)) != 0) {
+            if (ui_page == 0)
+                nudge(PM_POS, e);
+            else if (ui_page == 1) {
+                uint8_t k, m, t, f;
+                pm_fx_get(&k, &m, &t, &f);
+                add8(&t, e, 127);
+                pm_fx_set(k, m, t, f);
+            } else if (ui_page == 2)
+                add8(&play.gate, e, 8);
+            else
+                add8(&play.seq_vel[seq_edit], e, 127);
+            dirty = 1;
+            t_change = fm1_ms;
+        }
+        if ((e = take_enc(ENC_KNOB2)) != 0) {
+            if (ui_page == 0)
+                nudge(PM_COLOR, e);
+            else if (ui_page == 1) {
+                uint8_t k, m, t, f;
+                pm_fx_get(&k, &m, &t, &f);
+                add8(&f, e, 127);
+                pm_fx_set(k, m, t, f);
+            } else if (ui_page == 2)
+                add8(&play.octaves, e, 3);
+            else {
+                int32_t n = (int32_t)play.seq_len + (e > 0 ? 1 : -1);
+                if (n < 1)
+                    n = 1;
+                if (n > 16)
+                    n = 16;
+                play.seq_len = (uint8_t)n;
+            }
+            dirty = 1;
+            t_change = fm1_ms;
+        }
+        if ((e = take_enc(ENC_KNOB3)) != 0) {
+            if (ui_page == 0)
+                nudge(PM_EXCITE, e);
+            else if (ui_page == 2)
+                play.latch = (uint8_t)!play.latch;
+            dirty = 1;
+            t_change = fm1_ms;
+        }
+        if ((e = take_enc(ENC_KNOB4)) != 0) {
+            nudge(PM_LEVEL, e);
+            dirty = 1;
+            t_change = fm1_ms;
+        }
 
         midi_in();
         if (clk_bpm && fm1_ms - clk_t0 > 2000u)
@@ -527,10 +658,13 @@ static void app_main(void)
 #endif
         pr = &presets[pm_preset_index()];
         note_name(pm_last_note(), note);
-        parm = 0;
+        parm = ui_page;
         for (k = 0; k < PM_NPARAM; k++)
             parm = parm * 131u + pm_get_param((uint8_t)k);
         parm ^= (uint32_t)pm_model() << 24;
+        parm ^= (uint32_t)pm_fx_kind() << 16;
+        parm ^= (uint32_t)play.mode << 8;
+        parm ^= seq_edit;
 
         idle_ok = 1;
         if (parm != parm_drawn) { parm_drawn = parm; draw_params(); }
@@ -577,12 +711,16 @@ static void app_main(void)
             draw_text_box(0, 40, 240, &FONT_S, line, C_ACC, 1);
         }
         if (lit != lit_drawn) { lit_drawn = lit; draw_keys(lit); }
-        st = (uint32_t)(oct + 2) | ((uint32_t)set.ch << 4) | (clk_bpm << 12) | (set.latch << 20) | (midi_sus << 21) | (midi_src << 22) | ((uint32_t)pm_fx_kind() << 28);
+        st = (uint32_t)(oct + 2) | ((uint32_t)set.ch << 4) | (clk_bpm << 12) | (set.latch << 20) | (midi_sus << 21) | (midi_src << 22) | ((uint32_t)pm_fx_kind() << 26) | ((uint32_t)ui_page << 29);
         if (st != status_drawn) {
             char s[40];
             uint32_t i = 0;
             const char *p = "OCT ";
             status_drawn = st;
+            p = ui_page == 1 ? "FX " : ui_page == 2 ? "ARP " : ui_page == 3 ? "SEQ " : "TONE ";
+            while (*p)
+                s[i++] = *p++;
+            p = "OCT ";
             while (*p)
                 s[i++] = *p++;
             s[i++] = oct < 0 ? '-' : '+';
