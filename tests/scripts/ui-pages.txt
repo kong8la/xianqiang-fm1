@@ -1,0 +1,10 @@
+# Four panel pages, then a held chord so the scope and keys are visible.
+100 keys 128
+350 shot
+450 btn 6
+750 shot
+850 btn 6
+1150 shot
+1250 btn 6
+1550 shot
+1700 end
