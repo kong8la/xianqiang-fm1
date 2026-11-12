@@ -1,0 +1,14 @@
+道哥合成器 firmware is GPL-3.0-only.
+
+The FM-1 panel, USB, MIDI, screen and update path come from Dinghy
+(commit ea1b6bf), itself the Felucca / SLOOP platform.
+
+Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments.
+
+0.2.2 takes the printed-label table from JIANT
+(https://github.com/juanjiant-bit/JIANT), firmware/src/panel.c
+PANEL_DEFAULT. JIANT is GPL-3.0-only and is also a Felucca fork.
+
+Portions Copyright (C) 2026 Juan Ignacio Antonucci (Juan Jiant).
+
+dsp/ and host/ are MIT. See LICENSING.md.

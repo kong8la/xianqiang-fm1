@@ -4,11 +4,15 @@ M-VAVE FM-1 的物理建模固件。六复音，44.1 kHz，定点运算。屏幕
 
 ![道哥合成器面板：尼龙拨弦，G4，六个参数条](docs/screen.png)
 
-拨弦、木棒、钟、鼓膜、拉弦和吹管做在同一套引擎里，0.2 又加了筝、锣、风琴管和拉奏木棒。0.1 在 `dist/xianqiang-0.1.fwsc`（身份 `FM-1_941`）。0.2 在 `dist/daoge-0.2.fwsc`，0.2.1 在 `dist/daoge-0.2.1.fwsc`（身份都是 `FM-1_942`，包名不同）。
+拨弦、木棒、钟、鼓膜、拉弦和吹管做在同一套引擎里，0.2 又加了筝、锣、风琴管和拉奏木棒。0.1 在 `dist/xianqiang-0.1.fwsc`（身份 `FM-1_941`）。0.2、0.2.1、0.2.2 的包名分别是 `daoge-0.2.fwsc`、`daoge-0.2.1.fwsc`、`daoge-0.2.2.fwsc`（身份都是 `FM-1_942`，包名不同）。
 
-## 0.2.1 面板
+## 0.2.2 面板
 
-丝印和矩阵编号是对过的：开机引导里 OCT− 在 PA8 第 0 列、OCT+ 在第 1 列，PLAY 在 PA6 第 10 列（编号 12），REC 在 PA6 第 7 列（编号 13）。Felucca 量过 PLAY/REC，其余编号和丝印的默认对应是同一张表。0.2 里 ARP、SEQ、PLAY、REC、GLO 几乎不改屏幕，所以按下去像没扫到。0.2.1 每个丝印键都会在屏幕中部打出编号和名字，并打开对应的一页。
+按键扫描和 JIANT、Felucca 是同一张矩阵：开机引导里 OCT− 在 PA8 第 0 列、OCT+ 在第 1 列，PLAY 在 PA6 第 10 列（编号 12），REC 在 PA6 第 7 列（编号 13）。丝印和编号的默认表来自 JIANT 的 `firmware/src/panel.c`（`PANEL_DEFAULT`，GPL-3.0）。
+
+0.2 和 0.2.1 只在主循环里取一次“刚按下”的边沿，然后才去刷大块屏幕。音符能响，是因为主循环每次都读 `fm1_in.notes` 这一整字。0.2.2 的 `ui_input()` 用同样的办法读 `fm1_in.buttons`，边沿也并进去，而且刷屏幕的空档里也会再读一次。横幅写的是原始编号加丝印，例如 `06 EDIT FX`，页签跟着换。
+
+上排：**FX SEL ENV LFO EDIT GLO**。下排：**HOME SAVE ARP SEQ PLAY REC**。另外是 **OCT− OCT+**。
 
 上排：**FX SEL ENV LFO EDIT GLO**。下排：**HOME SAVE ARP SEQ PLAY REC**。另外是 **OCT− OCT+**。
 
@@ -18,10 +22,10 @@ M-VAVE FM-1 的物理建模固件。六复音，44.1 kHz，定点运算。屏幕
 | OCT+ | 1 | 升八度，屏幕写 OCT+ | 下一页 |
 | FX | 2 | 打开 FX 页，并在关 / 混响 / 延时 / 合唱之间换 |  |
 | SEL | 3 | MIDI 通道，OMNI 然后 1–16 | 同 FX，换效果类型 |
-| ENV | 4 | 短按延音开关。按住不放就是换档 |  |
-| LFO | 5 | 进入或离开用户槽 U1–U8 |  |
-| EDIT | 6 | 下一页：TONE、FX、ARP、SEQ，顶上的页签变色 |  |
-| GLO | 7 | 弯音范围在 2、7、12 半音之间换，屏幕写 BEND |  |
+| ENV | 4 | 打开 ENV 页。短按再切换延音。按住不放就是换档 |  |
+| LFO | 5 | 打开 LFO 页，并在用户槽和工厂预设之间换 |  |
+| EDIT | 6 | 下一页：OSC、FX、ENV、LFO、ARP、SEQ |  |
+| GLO | 7 | 打开 LFO 页，弯音范围在 2、7、12 半音之间换 |  |
 | HOME | 8 | 立刻静音 | 把当前音色存进选中的用户槽 |
 | SAVE | 9 | 存用户槽。声音停了才擦 `0xF4000` / `0xF5000` 里较旧的那一份，带 CRC |  |
 | ARP | 10 | 琶音开关，并打开 ARP 页 |  |
@@ -35,8 +39,10 @@ M-VAVE FM-1 的物理建模固件。六复音，44.1 kHz，定点运算。屏幕
 
 | 页 | SELECT | ALGORITHM | KNOB1 | KNOB2 | KNOB3 | KNOB4 |
 | --- | --- | --- | --- | --- | --- | --- |
-| TONE | 衰减 | 亮度 | 位置 | 色彩 | 激励 | 电平 |
+| OSC | 衰减 | 亮度 | 位置 | 色彩 | 激励 | 电平 |
 | FX | 类型 0–3 | 混合 | 时间 | 反馈 |  | 电平 |
+| ENV | 衰减 | 激励 | 亮度 | 延音开关 | 色彩 | 电平 |
+| LFO | 调制深度 | 弯音范围 |  |  |  | 电平 |
 | ARP | 模式 0–4 | 速率 | 门宽 | 八度 | 锁 | 电平 |
 | SEQ | 步 | 音高 | 力度 | 长度 |  | 电平 |
 
@@ -81,7 +87,7 @@ M-VAVE FM-1 的物理建模固件。六复音，44.1 kHz，定点运算。屏幕
 
 [Dinghy](https://github.com/zvenson/dinghy)（本树取自提交 `ea1b6bf`，2026-11-07）是同一族平台里专门用来换成自己的乐器的那一版：更新、USB 救援、USB-MIDI、TRS MIDI IN、USB 音频、按键、编码器和屏幕都已经接好，应用就是 `firmware/src/xianqiang.c`。闪存驱动同时认 Puya `0x856014` 和 UC25HQ80 `0xB36014`。DSP 写在 `dsp/`，是教科书算法的定点实现，没有移植 DaisySP 或 Rings 的代码。
 
-`dsp/` 和 `host/` 为 MIT。链进 Dinghy 之后，整份固件按 GPL-3.0-only 发布。平台版权在 `LICENSING.md`。
+`dsp/` 和 `host/` 为 MIT。链进 Dinghy 之后，整份固件按 GPL-3.0-only 发布。平台版权在 `LICENSING.md`。0.2.2 的按键名表来自 [JIANT](https://github.com/juanjiant-bit/JIANT)（Juan Ignacio Antonucci，GPL-3.0-only）的 `firmware/src/panel.c`，JIANT 又基于 Felucca（Leo Kuroshita，Hügelton Instruments）。
 
 ## 模型和预设
 
@@ -206,6 +212,7 @@ SDK 里打进安装包的三个文件，标签 `AC79NN_SDK_V1.2.1_2023-12-13`：
 ./build.sh --release 0.1      # build/xianqiang-0.1.fwsc ，身份 FM-1_941
 ./build.sh --release 0.2      # build/daoge-0.2.fwsc ，身份 FM-1_942
 ./build.sh --release 0.2.1    # build/daoge-0.2.1.fwsc ，身份仍是 FM-1_942
+./build.sh --release 0.2.2    # build/daoge-0.2.2.fwsc ，身份仍是 FM-1_942
 BOARD=smk37 ./build.sh        # SMK-37 Pro，身份 SMK-37 Pro_940
 ```
 

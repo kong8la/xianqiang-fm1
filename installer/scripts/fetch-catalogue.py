@@ -23,7 +23,7 @@ V15_URL = (
     "b178ac43c25f010c60a878056fb5331fe693fd62/sdk/firmware/FM-1_015.fwsc"
 )
 V15_SHA = "db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a"
-KEEP = {"daoge-0.2.1.fwsc", "daoge-0.2.fwsc", "xianqiang-0.1.fwsc", "FM-1_015.fwsc"}
+KEEP = {"daoge-0.2.2.fwsc", "daoge-0.2.1.fwsc", "daoge-0.2.fwsc", "xianqiang-0.1.fwsc", "FM-1_015.fwsc"}
 
 
 def get(url: str) -> bytes:
@@ -46,7 +46,8 @@ def main() -> None:
             dst.write_bytes(src.read_bytes())
         return dst.read_bytes()
 
-    cur = mirror("daoge-0.2.1.fwsc")
+    cur = mirror("daoge-0.2.2.fwsc")
+    prev21 = mirror("daoge-0.2.1.fwsc")
     mid = mirror("daoge-0.2.fwsc")
     prev = mirror("xianqiang-0.1.fwsc")
 
@@ -66,6 +67,7 @@ def main() -> None:
             print(f"removed {path.name}")
 
     cur_sha = sha256(cur)
+    prev21_sha = sha256(prev21)
     mid_sha = sha256(mid)
     prev_sha = sha256(prev)
     v15_sha = sha256(v15)
@@ -80,14 +82,31 @@ def main() -> None:
                 "featured": True,
                 "name": "道哥合成器",
                 "author": "本仓库",
-                "summary": "0.2.1：丝印按键都会在屏幕上打开对应的页。认 Puya 与 UC25HQ80。",
+                "summary": "0.2.2：按键跟音符一样每次采样，六页 OSC / FX / ENV / LFO / ARP / SEQ。认 Puya 与 UC25HQ80。",
                 "license": "GPL-3.0-only",
-                "version": "0.2.1",
+                "version": "0.2.2",
                 "source": "https://github.com/kong8la/xianqiang-fm1",
                 "flash": "new",
                 "product": "FM-1_942",
                 "sha256": cur_sha,
                 "size": len(cur),
+                "file": "pkg/daoge-0.2.2.fwsc",
+                "tag": "v0.2.2",
+            },
+            {
+                "id": "daoge-021",
+                "kind": "install",
+                "featured": False,
+                "name": "道哥合成器 0.2.1",
+                "author": "本仓库",
+                "summary": "0.2.1：丝印按键都会在屏幕上打开对应的页。",
+                "license": "GPL-3.0-only",
+                "version": "0.2.1",
+                "source": "https://github.com/kong8la/xianqiang-fm1",
+                "flash": "new",
+                "product": "FM-1_942",
+                "sha256": prev21_sha,
+                "size": len(prev21),
                 "file": "pkg/daoge-0.2.1.fwsc",
                 "tag": "v0.2.1",
             },
@@ -144,7 +163,7 @@ def main() -> None:
         },
     }
     (PUBLIC / "catalogue.json").write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
-    print(f"catalogue 0.2.1 {cur_sha[:12]} + 0.2 {mid_sha[:12]} + 0.1 {prev_sha[:12]} + V15 {v15_sha[:12]}")
+    print(f"catalogue 0.2.2 {cur_sha[:12]} + 0.2.1 {prev21_sha[:12]} + 0.2 {mid_sha[:12]} + 0.1 {prev_sha[:12]} + V15 {v15_sha[:12]}")
 
 
 if __name__ == "__main__":
