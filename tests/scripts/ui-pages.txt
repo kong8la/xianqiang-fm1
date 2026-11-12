@@ -1,10 +1,14 @@
-# Four panel pages, then a held chord so the scope and keys are visible.
-100 keys 128
-350 shot
-450 btn 6
-750 shot
-850 btn 6
-1150 shot
-1250 btn 6
-1550 shot
-1700 end
+# One EDIT press per page. The same ui_input() the device calls.
+150 keys 128
+280 shot
+360 btn 6
+520 shot
+600 btn 6
+760 shot
+840 btn 6
+1000 shot
+1080 btn 6
+1240 shot
+1320 btn 6
+1480 shot
+1600 end
